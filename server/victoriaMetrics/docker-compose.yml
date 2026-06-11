@@ -14,3 +14,4 @@ services:
 
 volumes:
   victoria-metrics-data:
+    external: true

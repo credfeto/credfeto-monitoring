@@ -1,0 +1,59 @@
+#!/bin/sh
+set -eu
+
+die() {
+    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    exit 1
+}
+
+success() {
+    printf '\n\033[32m✓\033[0m %s\n' "$*"
+}
+
+info() {
+    printf '\n\033[32m→\033[0m %s\n' "$*"
+}
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DATA_DIR="/data/victoria-metrics"
+VOLUME_NAME="victoria-metrics-data"
+
+create_data_dir() {
+    if [ -d "${DATA_DIR}" ]; then
+        info "${DATA_DIR} already exists."
+    else
+        info "Creating data directory ${DATA_DIR}..."
+        sudo mkdir -p "${DATA_DIR}"
+        success "Created ${DATA_DIR}."
+    fi
+}
+
+create_volume() {
+    if sudo docker volume inspect "${VOLUME_NAME}" > /dev/null 2>&1; then
+        info "Volume ${VOLUME_NAME} already exists."
+    else
+        info "Creating Docker volume ${VOLUME_NAME}..."
+        sudo docker volume create \
+            --opt type=none \
+            --opt o=bind \
+            --opt device="${DATA_DIR}" \
+            "${VOLUME_NAME}"
+        success "Created volume ${VOLUME_NAME}."
+    fi
+}
+
+start_services() {
+    info "Starting VictoriaMetrics..."
+    sudo docker compose up -d
+    success "VictoriaMetrics started."
+}
+
+main() {
+    cd "${SCRIPT_DIR}"
+    create_data_dir
+    create_volume
+    start_services
+    success "Installation complete."
+}
+
+main
