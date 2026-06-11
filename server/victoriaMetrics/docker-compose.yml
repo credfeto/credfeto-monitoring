@@ -1,0 +1,16 @@
+---
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.111.0
+    container_name: victoriametrics
+    ports:
+      - "127.0.0.1:8428:8428"
+    volumes:
+      - victoria-metrics-data:/storage
+    command:
+      - --storageDataPath=/storage
+      - --retentionPeriod=12
+    restart: unless-stopped
+
+volumes:
+  victoria-metrics-data:
