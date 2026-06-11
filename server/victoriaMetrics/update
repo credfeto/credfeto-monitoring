@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+die() {
+    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    exit 1
+}
+
+success() {
+    printf '\n\033[32m✓\033[0m %s\n' "$*"
+}
+
+info() {
+    printf '\n\033[32m→\033[0m %s\n' "$*"
+}
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+main() {
+    cd "${SCRIPT_DIR}"
+    info "Updating repository..."
+    git pull
+    info "Pulling latest images..."
+    sudo docker compose pull
+    info "Restarting services..."
+    sudo docker compose up -d --remove-orphans
+    success "Update complete."
+}
+
+main
