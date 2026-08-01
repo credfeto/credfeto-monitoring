@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 ### Fixed
+- Fixed README.md formatting to pass the markdownlint pre-commit baseline check.
 ### Changed
 ### Deprecated
 ### Removed
