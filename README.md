@@ -1,6 +1,6 @@
 # credfeto-monitoring
 
-Deployment scripts and configuration for a self-hosted [VictoriaMetrics](https://victoriametrics.com/) metrics server and the [Telegraf](https://www.influxdata.com/time-series-platform/telegraf/) agents that feed it.
+Deployment scripts and configuration for a self-hosted [VictoriaMetrics][victoriametrics] metrics server and the [Telegraf][telegraf] agents that feed it.
 
 ## Build Status
 
@@ -39,23 +39,28 @@ cd client/Telegraf
 
 ## Changelog
 
-View [changelog](CHANGELOG.md)
+View [changelog][changelog]
 
 ## Contributing
 
-See [CONTRIBUTING](CONTRIBUTING.md)
+See [CONTRIBUTING][contributing]
 
 ## Security
 
-See [SECURITY](SECURITY.md)
+See [SECURITY][security]
 
 ## Licence
 
-See [LICENSE](LICENSE)
+See [LICENSE][licence]
 
+[changelog]: CHANGELOG.md
+[contributing]: CONTRIBUTING.md
 [licence-img]: https://img.shields.io/github/license/credfeto/credfeto-monitoring
 [licence]: LICENSE
 [pre-release-img]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-pre-release.yml/badge.svg
 [pre-release]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-pre-release.yml
 [release-img]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-release.yml/badge.svg
 [release]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-release.yml
+[security]: SECURITY.md
+[telegraf]: https://www.influxdata.com/time-series-platform/telegraf/
+[victoriametrics]: https://victoriametrics.com/
