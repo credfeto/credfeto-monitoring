@@ -14,6 +14,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Fixed
 - Fixed README.md formatting to pass the markdownlint pre-commit baseline check.
 ### Changed
+- Rewrote README.md to describe the actual repo contents (VictoriaMetrics server and Telegraf client) instead of the leftover cs-template placeholder text.
 ### Deprecated
 ### Removed
 ### Deployment Changes
