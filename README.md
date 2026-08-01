@@ -55,12 +55,12 @@ See [LICENSE][licence]
 
 [changelog]: CHANGELOG.md
 [contributing]: CONTRIBUTING.md
-[licence-img]: https://img.shields.io/github/license/credfeto/credfeto-monitoring
 [licence]: LICENSE
-[pre-release-img]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-pre-release.yml/badge.svg
+[licence-img]: https://img.shields.io/github/license/credfeto/credfeto-monitoring
 [pre-release]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-pre-release.yml
-[release-img]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-release.yml/badge.svg
+[pre-release-img]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-pre-release.yml/badge.svg
 [release]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-release.yml
+[release-img]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-release.yml/badge.svg
 [security]: SECURITY.md
 [telegraf]: https://www.influxdata.com/time-series-platform/telegraf/
 [victoriametrics]: https://victoriametrics.com/
