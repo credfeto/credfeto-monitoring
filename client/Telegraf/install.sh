@@ -28,8 +28,7 @@ key_fingerprint() {
     gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }'
 }
 
-install_ubuntu() {
-    info "Installing Telegraf on Ubuntu/Debian..."
+setup_influxdata_apt_repo() {
     info "Adding InfluxData apt repository..."
 
     # The old install left this file behind; a repository still configured to
@@ -70,6 +69,11 @@ install_ubuntu() {
     if [ "$(cat "${sources_list}" 2>/dev/null)" != "${sources_list_line}" ]; then
         echo "${sources_list_line}" | sudo tee "${sources_list}" > /dev/null
     fi
+}
+
+install_ubuntu() {
+    info "Installing Telegraf on Ubuntu/Debian..."
+    setup_influxdata_apt_repo
 
     if ! dpkg -l telegraf 2>/dev/null | grep -q '^ii'; then
         sudo apt-get update -qq
