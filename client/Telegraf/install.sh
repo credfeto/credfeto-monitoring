@@ -60,7 +60,12 @@ setup_influxdata_apt_repo() {
             die "InfluxData signing key fingerprint mismatch: expected ${influxdata_key_fingerprint}, got ${actual_fingerprint:-<none>}"
         fi
 
-        gpg --yes --dearmor -o "${work_dir}/key.gpg" "${work_dir}/key.asc"
+        # Import then re-export by the verified fingerprint, rather than
+        # dearmoring the downloaded file wholesale: this guarantees only the
+        # pinned key's material reaches the trusted keyring even if the
+        # response ever bundled the legitimate key alongside another one.
+        gpg --quiet --import "${work_dir}/key.asc"
+        gpg --yes --output "${work_dir}/key.gpg" --export "${influxdata_key_fingerprint}"
 
         sudo install -d -m 0755 /etc/apt/keyrings
         sudo install -m 0644 "${work_dir}/key.gpg" "${keyring_path}"
