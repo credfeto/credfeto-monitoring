@@ -37,24 +37,33 @@ install_ubuntu() {
     # with `gpg --show-keys --with-colons`; this is the primary key fingerprint,
     # which stays constant across InfluxData's subkey rotations (see issue #22).
     influxdata_key_fingerprint="24C975CBA61A024EE1B631787C3D57159FC2F927"
+    keyring_path="/etc/apt/keyrings/influxdata-archive.gpg"
     work_dir=$(mktemp -d)
     trap 'rm -rf "${work_dir}"' EXIT
     export GNUPGHOME="${work_dir}/gnupg"
     mkdir -m 0700 "${GNUPGHOME}"
 
-    curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${work_dir}/key.asc"
+    # Skip the network fetch when the installed keyring is already the verified
+    # key, so re-running this script on an already-repaired host is a no-op here.
+    installed_fingerprint=""
+    if [ -f "${keyring_path}" ]; then
+        installed_fingerprint=$(gpg --show-keys --with-colons "${keyring_path}" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }')
+    fi
+    if [ "${installed_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
+        curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${work_dir}/key.asc"
 
-    actual_fingerprint=$(gpg --show-keys --with-colons "${work_dir}/key.asc" | awk -F: '$1 == "fpr" { print $10; exit }')
-    if [ "${actual_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
-        die "InfluxData signing key fingerprint mismatch: expected ${influxdata_key_fingerprint}, got ${actual_fingerprint:-<none>}"
+        actual_fingerprint=$(gpg --show-keys --with-colons "${work_dir}/key.asc" | awk -F: '$1 == "fpr" { print $10; exit }')
+        if [ "${actual_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
+            die "InfluxData signing key fingerprint mismatch: expected ${influxdata_key_fingerprint}, got ${actual_fingerprint:-<none>}"
+        fi
+
+        gpg --yes --dearmor -o "${work_dir}/key.gpg" "${work_dir}/key.asc"
+
+        sudo install -d -m 0755 /etc/apt/keyrings
+        sudo install -m 0644 "${work_dir}/key.gpg" "${keyring_path}"
     fi
 
-    gpg --yes --dearmor -o "${work_dir}/key.gpg" "${work_dir}/key.asc"
-
-    sudo install -d -m 0755 /etc/apt/keyrings
-    sudo install -m 0644 "${work_dir}/key.gpg" /etc/apt/keyrings/influxdata-archive.gpg
-
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/influxdata-archive.gpg] https://repos.influxdata.com/ubuntu stable main" \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring_path}] https://repos.influxdata.com/ubuntu stable main" \
         | sudo tee /etc/apt/sources.list.d/influxdata.list > /dev/null
 
     if ! dpkg -l telegraf 2>/dev/null | grep -q '^ii'; then
