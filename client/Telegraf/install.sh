@@ -33,26 +33,26 @@ install_ubuntu() {
     # sources entry pointing at a keyring file that no longer exists.
     sudo rm -f /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
 
+    # Verified directly against https://repos.influxdata.com/influxdata-archive.key
+    # with `gpg --show-keys --with-colons`; this is the primary key fingerprint,
+    # which stays constant across InfluxData's subkey rotations (see issue #22).
     influxdata_key_fingerprint="24C975CBA61A024EE1B631787C3D57159FC2F927"
-    gnupg_home=$(mktemp -d)
-    key_file=$(mktemp)
-    dearmored_file=$(mktemp)
-    export GNUPGHOME="${gnupg_home}"
+    work_dir=$(mktemp -d)
+    trap 'rm -rf "${work_dir}"' EXIT
+    export GNUPGHOME="${work_dir}/gnupg"
+    mkdir -m 0700 "${GNUPGHOME}"
 
-    curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${key_file}"
+    curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${work_dir}/key.asc"
 
-    actual_fingerprint=$(gpg --show-keys --with-colons "${key_file}" | awk -F: '$1 == "fpr" { print $10; exit }')
+    actual_fingerprint=$(gpg --show-keys --with-colons "${work_dir}/key.asc" | awk -F: '$1 == "fpr" { print $10; exit }')
     if [ "${actual_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
-        rm -rf "${gnupg_home}" "${key_file}" "${dearmored_file}"
         die "InfluxData signing key fingerprint mismatch: expected ${influxdata_key_fingerprint}, got ${actual_fingerprint:-<none>}"
     fi
 
-    gpg --yes --dearmor -o "${dearmored_file}" "${key_file}"
+    gpg --yes --dearmor -o "${work_dir}/key.gpg" "${work_dir}/key.asc"
 
     sudo install -d -m 0755 /etc/apt/keyrings
-    sudo install -m 0644 "${dearmored_file}" /etc/apt/keyrings/influxdata-archive.gpg
-    rm -rf "${gnupg_home}" "${key_file}" "${dearmored_file}"
-    unset GNUPGHOME
+    sudo install -m 0644 "${work_dir}/key.gpg" /etc/apt/keyrings/influxdata-archive.gpg
 
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/influxdata-archive.gpg] https://repos.influxdata.com/ubuntu stable main" \
         | sudo tee /etc/apt/sources.list.d/influxdata.list > /dev/null
