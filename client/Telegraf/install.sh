@@ -24,14 +24,40 @@ is_ai_agent() {
 
 install_ubuntu() {
     info "Installing Telegraf on Ubuntu/Debian..."
+    info "Adding InfluxData apt repository..."
+
+    # The old install left this file behind; a repository still configured to
+    # trust it fails apt-get update with NO_PUBKEY once InfluxData rotates keys.
+    # Removed unconditionally (not just when telegraf is missing) so a host that
+    # already has telegraf installed is repaired too, rather than left with a
+    # sources entry pointing at a keyring file that no longer exists.
+    sudo rm -f /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
+
+    influxdata_key_fingerprint="24C975CBA61A024EE1B631787C3D57159FC2F927"
+    gnupg_home=$(mktemp -d)
+    key_file=$(mktemp)
+    dearmored_file=$(mktemp)
+    export GNUPGHOME="${gnupg_home}"
+
+    curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${key_file}"
+
+    actual_fingerprint=$(gpg --show-keys --with-colons "${key_file}" | awk -F: '$1 == "fpr" { print $10; exit }')
+    if [ "${actual_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
+        rm -rf "${gnupg_home}" "${key_file}" "${dearmored_file}"
+        die "InfluxData signing key fingerprint mismatch: expected ${influxdata_key_fingerprint}, got ${actual_fingerprint:-<none>}"
+    fi
+
+    gpg --yes --dearmor -o "${dearmored_file}" "${key_file}"
+
+    sudo install -d -m 0755 /etc/apt/keyrings
+    sudo install -m 0644 "${dearmored_file}" /etc/apt/keyrings/influxdata-archive.gpg
+    rm -rf "${gnupg_home}" "${key_file}" "${dearmored_file}"
+    unset GNUPGHOME
+
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/influxdata-archive.gpg] https://repos.influxdata.com/ubuntu stable main" \
+        | sudo tee /etc/apt/sources.list.d/influxdata.list > /dev/null
 
     if ! dpkg -l telegraf 2>/dev/null | grep -q '^ii'; then
-        info "Adding InfluxData apt repository..."
-        curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key \
-            | gpg --dearmor \
-            | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
-        echo "deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/ubuntu stable main" \
-            | sudo tee /etc/apt/sources.list.d/influxdata.list > /dev/null
         sudo apt-get update -qq
         sudo apt-get install -y telegraf
     else
