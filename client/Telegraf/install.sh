@@ -37,9 +37,7 @@ install_ubuntu() {
     # Removed unconditionally (not just when telegraf is missing) so a host that
     # already has telegraf installed is repaired too, rather than left with a
     # sources entry pointing at a keyring file that no longer exists.
-    if [ -f /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg ]; then
-        sudo rm -f /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
-    fi
+    sudo rm -f /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
 
     # Verified directly against https://repos.influxdata.com/influxdata-archive.key
     # with `gpg --show-keys --with-colons`; this is the primary key fingerprint,
@@ -55,8 +53,7 @@ install_ubuntu() {
 
     # Skip the network fetch when the installed keyring is already the verified
     # key, so re-running this script on an already-repaired host is a no-op here.
-    installed_fingerprint=$(key_fingerprint "${keyring_path}")
-    if [ "${installed_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
+    if [ "$(key_fingerprint "${keyring_path}")" != "${influxdata_key_fingerprint}" ]; then
         curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${work_dir}/key.asc"
 
         actual_fingerprint=$(key_fingerprint "${work_dir}/key.asc")
