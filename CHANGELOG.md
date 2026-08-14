@@ -14,6 +14,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Fixed
 - Fixed README.md formatting to pass the markdownlint pre-commit baseline check.
 - VictoriaMetrics was bound to 127.0.0.1 only, making it unreachable from any other host on the network; changed to publish the port on all interfaces so Telegraf agents and the reverse proxy can actually reach it.
+- Telegraf install on Ubuntu/Debian failed because the InfluxData signing key it fetched had expired and no longer covered the repository's active signing subkey; now fetches the current key, verifies its fingerprint before trusting it, and self-repairs hosts left with the stale keyring.
 ### Changed
 - Rewrote README.md to describe the actual repo contents (VictoriaMetrics server and Telegraf client) instead of the leftover cs-template placeholder text.
 ### Deprecated
