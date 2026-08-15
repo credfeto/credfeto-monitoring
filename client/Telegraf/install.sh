@@ -22,16 +22,65 @@ is_ai_agent() {
     [ "${CLAUDECODE:-}" = "1" ]
 }
 
+# Prints the primary key fingerprint of a key file, or nothing if the file is
+# missing or unparsable.
+key_fingerprint() {
+    gpg --show-keys --with-colons "$1" 2>/dev/null | awk -F: '$1 == "fpr" { print $10; exit }'
+}
+
+setup_influxdata_apt_repo() {
+    info "Adding InfluxData apt repository..."
+
+    # The old install left this file behind; a repository still configured to
+    # trust it fails apt-get update with NO_PUBKEY once InfluxData rotates keys.
+    # Removed unconditionally (not just when telegraf is missing) so a host that
+    # already has telegraf installed is repaired too, rather than left with a
+    # sources entry pointing at a keyring file that no longer exists.
+    sudo rm -f /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg
+
+    # Verified directly against https://repos.influxdata.com/influxdata-archive.key
+    # with `gpg --show-keys --with-colons`; this is the primary key fingerprint,
+    # which stays constant across InfluxData's subkey rotations (see issue #22).
+    influxdata_key_fingerprint="24C975CBA61A024EE1B631787C3D57159FC2F927"
+    keyring_path="/etc/apt/keyrings/influxdata-archive.gpg"
+    sources_list="/etc/apt/sources.list.d/influxdata.list"
+    sources_list_line="deb [arch=$(dpkg --print-architecture) signed-by=${keyring_path}] https://repos.influxdata.com/ubuntu stable main"
+    work_dir=$(mktemp -d)
+    trap 'rm -rf "${work_dir}"' EXIT
+    export GNUPGHOME="${work_dir}/gnupg"
+    mkdir -m 0700 "${GNUPGHOME}"
+
+    # Skip the network fetch when the installed keyring is already the verified
+    # key, so re-running this script on an already-repaired host is a no-op here.
+    if [ "$(key_fingerprint "${keyring_path}")" != "${influxdata_key_fingerprint}" ]; then
+        curl -fsSL https://repos.influxdata.com/influxdata-archive.key -o "${work_dir}/key.asc"
+
+        actual_fingerprint=$(key_fingerprint "${work_dir}/key.asc")
+        if [ "${actual_fingerprint}" != "${influxdata_key_fingerprint}" ]; then
+            die "InfluxData signing key fingerprint mismatch: expected ${influxdata_key_fingerprint}, got ${actual_fingerprint:-<none>}"
+        fi
+
+        # Import then re-export by the verified fingerprint, rather than
+        # dearmoring the downloaded file wholesale: this guarantees only the
+        # pinned key's material reaches the trusted keyring even if the
+        # response ever bundled the legitimate key alongside another one.
+        gpg --quiet --import "${work_dir}/key.asc"
+        gpg --yes --output "${work_dir}/key.gpg" --export "${influxdata_key_fingerprint}"
+
+        sudo install -d -m 0755 /etc/apt/keyrings
+        sudo install -m 0644 "${work_dir}/key.gpg" "${keyring_path}"
+    fi
+
+    if [ "$(cat "${sources_list}" 2>/dev/null)" != "${sources_list_line}" ]; then
+        echo "${sources_list_line}" | sudo tee "${sources_list}" > /dev/null
+    fi
+}
+
 install_ubuntu() {
     info "Installing Telegraf on Ubuntu/Debian..."
+    setup_influxdata_apt_repo
 
     if ! dpkg -l telegraf 2>/dev/null | grep -q '^ii'; then
-        info "Adding InfluxData apt repository..."
-        curl -fsSL https://repos.influxdata.com/influxdata-archive_compat.key \
-            | gpg --dearmor \
-            | sudo tee /etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg > /dev/null
-        echo "deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/ubuntu stable main" \
-            | sudo tee /etc/apt/sources.list.d/influxdata.list > /dev/null
         sudo apt-get update -qq
         sudo apt-get install -y telegraf
     else
