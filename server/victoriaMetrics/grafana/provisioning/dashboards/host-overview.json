@@ -46,7 +46,7 @@
       },
       "targets": [
         {
-          "expr": "100 - avg by (host) (cpu_usage_idle{host=~\"$host\"})",
+          "expr": "100 - avg by (host) (cpu_usage_idle{host=~\"$host\", cpu=\"cpu-total\"})",
           "legendFormat": "{{host}}"
         }
       ]
