@@ -19,13 +19,16 @@ This repo hosts the infrastructure for a small self-hosted monitoring stack: a V
 
 ### Server: VictoriaMetrics
 
-`server/victoriaMetrics/` contains the Docker Compose stack and helper scripts for the metrics server.
+`server/victoriaMetrics/` contains the Docker Compose stack and helper scripts for the metrics server, including a [Grafana][grafana] instance provisioned to visualise the collected metrics.
 
 ```sh
 cd server/victoriaMetrics
-./install   # first-time setup: creates the data volume and starts the stack
-./update    # pulls the latest images and restarts the stack
+cp .env.example .env  # first-time setup: set GF_SECURITY_ADMIN_PASSWORD
+./install              # creates the data volumes and starts the stack
+./update               # pulls the latest images and restarts the stack
 ```
+
+Grafana is available on port `3000` once the stack is running. Its VictoriaMetrics datasource and dashboards (host overview, Docker containers) are provisioned automatically from `server/victoriaMetrics/grafana/provisioning/`; no manual configuration is required.
 
 ### Client: Telegraf
 
@@ -55,6 +58,7 @@ See [LICENSE][licence]
 
 [changelog]: CHANGELOG.md
 [contributing]: CONTRIBUTING.md
+[grafana]: https://grafana.com/
 [licence]: LICENSE
 [licence-img]: https://img.shields.io/github/license/credfeto/credfeto-monitoring
 [pre-release]: https://github.com/credfeto/credfeto-monitoring/actions/workflows/build-and-publish-pre-release.yml

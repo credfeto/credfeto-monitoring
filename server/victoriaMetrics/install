@@ -15,43 +15,61 @@ info() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DATA_DIR="/data/victoria-metrics"
-VOLUME_NAME="victoria-metrics-data"
+# Pairs of "volume-name:data-dir", optionally followed by ":uid:gid" when the
+# container runs as a non-root user that needs to own the bind-mounted dir.
+DATA_VOLUMES="victoria-metrics-data:/data/victoria-metrics grafana-data:/data/grafana:472:472"
 
-create_data_dir() {
-    if [ -d "${DATA_DIR}" ]; then
-        info "${DATA_DIR} already exists."
-    else
-        info "Creating data directory ${DATA_DIR}..."
-        sudo mkdir -p "${DATA_DIR}"
-        success "Created ${DATA_DIR}."
-    fi
+create_data_dirs_and_volumes() {
+    for pair in ${DATA_VOLUMES}; do
+        volume_name="${pair%%:*}"
+        rest="${pair#*:}"
+        data_dir="${rest%%:*}"
+
+        if [ -d "${data_dir}" ]; then
+            info "${data_dir} already exists."
+        else
+            info "Creating data directory ${data_dir}..."
+            sudo mkdir -p "${data_dir}"
+            success "Created ${data_dir}."
+        fi
+
+        case "${rest}" in
+            *:*)
+                owner="${rest#*:}"
+                sudo chown "${owner}" "${data_dir}"
+                ;;
+        esac
+
+        if sudo docker volume inspect "${volume_name}" > /dev/null 2>&1; then
+            info "Volume ${volume_name} already exists."
+        else
+            info "Creating Docker volume ${volume_name}..."
+            sudo docker volume create \
+                --opt type=none \
+                --opt o=bind \
+                --opt device="${data_dir}" \
+                "${volume_name}"
+            success "Created volume ${volume_name}."
+        fi
+    done
 }
 
-create_volume() {
-    if sudo docker volume inspect "${VOLUME_NAME}" > /dev/null 2>&1; then
-        info "Volume ${VOLUME_NAME} already exists."
-    else
-        info "Creating Docker volume ${VOLUME_NAME}..."
-        sudo docker volume create \
-            --opt type=none \
-            --opt o=bind \
-            --opt device="${DATA_DIR}" \
-            "${VOLUME_NAME}"
-        success "Created volume ${VOLUME_NAME}."
+check_env_file() {
+    if [ ! -f "${SCRIPT_DIR}/.env" ]; then
+        die "Missing ${SCRIPT_DIR}/.env - copy .env.example to .env and set GF_SECURITY_ADMIN_PASSWORD before running install."
     fi
 }
 
 start_services() {
-    info "Starting VictoriaMetrics..."
+    info "Starting VictoriaMetrics and Grafana..."
     sudo docker compose up -d
-    success "VictoriaMetrics started."
+    success "VictoriaMetrics and Grafana started."
 }
 
 main() {
     cd "${SCRIPT_DIR}"
-    create_data_dir
-    create_volume
+    check_env_file
+    create_data_dirs_and_volumes
     start_services
     success "Installation complete."
 }
