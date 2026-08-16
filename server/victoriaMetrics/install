@@ -18,8 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Pairs of "volume-name:data-dir", one per service.
 DATA_VOLUMES="victoria-metrics-data:/data/victoria-metrics grafana-data:/data/grafana"
 
-create_data_dirs() {
+create_data_dirs_and_volumes() {
     for pair in ${DATA_VOLUMES}; do
+        volume_name="${pair%%:*}"
         data_dir="${pair#*:}"
 
         if [ -d "${data_dir}" ]; then
@@ -29,13 +30,6 @@ create_data_dirs() {
             sudo mkdir -p "${data_dir}"
             success "Created ${data_dir}."
         fi
-    done
-}
-
-create_volumes() {
-    for pair in ${DATA_VOLUMES}; do
-        volume_name="${pair%%:*}"
-        data_dir="${pair#*:}"
 
         if sudo docker volume inspect "${volume_name}" > /dev/null 2>&1; then
             info "Volume ${volume_name} already exists."
@@ -66,8 +60,7 @@ start_services() {
 main() {
     cd "${SCRIPT_DIR}"
     check_env_file
-    create_data_dirs
-    create_volumes
+    create_data_dirs_and_volumes
     start_services
     success "Installation complete."
 }
