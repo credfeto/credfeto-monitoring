@@ -15,13 +15,15 @@ info() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Pairs of "volume-name:data-dir", one per service.
-DATA_VOLUMES="victoria-metrics-data:/data/victoria-metrics grafana-data:/data/grafana"
+# Pairs of "volume-name:data-dir", optionally followed by ":uid:gid" when the
+# container runs as a non-root user that needs to own the bind-mounted dir.
+DATA_VOLUMES="victoria-metrics-data:/data/victoria-metrics grafana-data:/data/grafana:472:472"
 
 create_data_dirs_and_volumes() {
     for pair in ${DATA_VOLUMES}; do
         volume_name="${pair%%:*}"
-        data_dir="${pair#*:}"
+        rest="${pair#*:}"
+        data_dir="${rest%%:*}"
 
         if [ -d "${data_dir}" ]; then
             info "${data_dir} already exists."
@@ -30,6 +32,13 @@ create_data_dirs_and_volumes() {
             sudo mkdir -p "${data_dir}"
             success "Created ${data_dir}."
         fi
+
+        case "${rest}" in
+            *:*)
+                owner="${rest#*:}"
+                sudo chown "${owner}" "${data_dir}"
+                ;;
+        esac
 
         if sudo docker volume inspect "${volume_name}" > /dev/null 2>&1; then
             info "Volume ${volume_name} already exists."
