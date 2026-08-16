@@ -1,0 +1,104 @@
+{
+  "uid": "docker-containers",
+  "title": "Docker Containers",
+  "tags": ["telegraf", "docker"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "VictoriaMetrics"
+        },
+        "query": "label_values(docker_container_cpu_usage_percent, host)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Container CPU Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg by (host, container_name) (docker_container_cpu_usage_percent{host=~\"$host\"})",
+          "legendFormat": "{{host}} {{container_name}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Container Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg by (host, container_name) (docker_container_mem_usage{host=~\"$host\"})",
+          "legendFormat": "{{host}} {{container_name}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Container Network I/O",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "VictoriaMetrics"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "avg by (host, container_name) (rate(docker_container_net_rx_bytes{host=~\"$host\"}[5m]))",
+          "legendFormat": "{{host}} {{container_name}} rx"
+        },
+        {
+          "expr": "avg by (host, container_name) (rate(docker_container_net_tx_bytes{host=~\"$host\"}[5m]))",
+          "legendFormat": "{{host}} {{container_name}} tx"
+        }
+      ]
+    }
+  ]
+}
