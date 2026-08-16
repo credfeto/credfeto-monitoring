@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- Add Grafana to the VictoriaMetrics server stack for dashboarding collected metrics
 ### Fixed
 - Fixed README.md formatting to pass the markdownlint pre-commit baseline check.
 - VictoriaMetrics was bound to 127.0.0.1 only, making it unreachable from any other host on the network; changed to publish the port on all interfaces so Telegraf agents and the reverse proxy can actually reach it.
