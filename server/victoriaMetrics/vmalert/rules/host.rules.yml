@@ -3,8 +3,11 @@ groups:
   - name: host
     interval: 1m
     rules:
+      - record: host:metrics_stale_seconds
+        expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m]))
+
       - alert: HostNotReporting
-        expr: (time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m]))) > 300
+        expr: host:metrics_stale_seconds > 300
         for: 5m
         labels:
           severity: critical

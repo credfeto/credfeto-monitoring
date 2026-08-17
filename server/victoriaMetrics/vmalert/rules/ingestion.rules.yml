@@ -4,7 +4,7 @@ groups:
     interval: 1m
     rules:
       - alert: MetricsIngestionStalled
-        expr: count(time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m])) < 300) == 0
+        expr: count(host:metrics_stale_seconds < 300) == 0
         for: 5m
         labels:
           severity: critical
