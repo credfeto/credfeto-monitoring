@@ -1,0 +1,13 @@
+---
+groups:
+  - name: ingestion
+    interval: 1m
+    rules:
+      - alert: MetricsIngestionStalled
+        expr: count(time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m])) < 300) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No hosts have reported metrics recently"
+          description: "No monitored host has sent fresh metrics within 5 minutes; the ingestion pipeline may be down."

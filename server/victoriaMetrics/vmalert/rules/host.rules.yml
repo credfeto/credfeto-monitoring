@@ -1,0 +1,13 @@
+---
+groups:
+  - name: host
+    interval: 1m
+    rules:
+      - alert: HostNotReporting
+        expr: (time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m]))) > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host {{ $labels.host }} is not reporting metrics"
+          description: "No metrics have been received from host {{ $labels.host }} for over 5 minutes."

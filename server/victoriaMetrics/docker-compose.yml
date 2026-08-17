@@ -25,8 +25,55 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     restart: unless-stopped
 
+  vmalert:
+    image: victoriametrics/vmalert:v1.111.0
+    container_name: vmalert
+    depends_on:
+      - victoriametrics
+      - alertmanager
+    ports:
+      - "8880:8880"
+    volumes:
+      - ./vmalert/rules:/etc/vmalert/rules:ro
+    tmpfs:
+      - /vmalert-remotewrite-data
+    command:
+      - --datasource.url=http://victoriametrics:8428
+      - --remoteWrite.url=http://victoriametrics:8428
+      - --remoteWrite.tmpDataPath=/vmalert-remotewrite-data
+      - --remoteRead.url=http://victoriametrics:8428
+      - --notifier.url=http://alertmanager:9093
+      - --rule=/etc/vmalert/rules/*.yml
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alertmanager/webhook_url:/etc/alertmanager/secrets/webhook_url:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    restart: unless-stopped
+
 volumes:
   victoria-metrics-data:
     external: true
   grafana-data:
+    external: true
+  alertmanager-data:
     external: true
