@@ -23,10 +23,10 @@ This repo hosts the infrastructure for a small self-hosted monitoring stack: a V
 
 ```sh
 cd server/victoriaMetrics
-cp .env.example .env                        # first-time setup: set GF_SECURITY_ADMIN_PASSWORD
-echo "<webhook url>" > alertmanager/webhook_url  # first-time setup: chat webhook for alert notifications
-./install                                    # creates the data volumes and starts the stack
-./update                                     # pulls the latest images and restarts the stack
+cp .env.example .env # first-time setup: set GF_SECURITY_ADMIN_PASSWORD
+echo "<webhook url>" > alertmanager/webhook_url # first-time setup: chat webhook for alert notifications
+./install # creates the data volumes and starts the stack
+./update # pulls the latest images and restarts the stack
 ```
 
 Grafana is available on port `3000` once the stack is running. Its VictoriaMetrics datasource and dashboards (host overview, Docker containers) are provisioned automatically from `server/victoriaMetrics/grafana/provisioning/`; no manual configuration is required.

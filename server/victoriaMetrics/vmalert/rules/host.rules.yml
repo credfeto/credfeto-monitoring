@@ -7,7 +7,7 @@ groups:
         expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m]))
 
       - alert: HostNotReporting
-        # 300s threshold is duplicated in ingestion.rules.yml's MetricsIngestionStalled - keep both in sync.
+        # 300s threshold is shared with MetricsIngestionStalled below - keep both in sync.
         expr: host:metrics_stale_seconds > 300
         for: 5m
         labels:
@@ -15,3 +15,13 @@ groups:
         annotations:
           summary: "Host {{ $labels.host }} is not reporting metrics"
           description: "No metrics have been received from host {{ $labels.host }} for over 5 minutes."
+
+      - alert: MetricsIngestionStalled
+        # 300s threshold is shared with HostNotReporting above - keep both in sync.
+        expr: count(host:metrics_stale_seconds < 300) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No hosts have reported metrics recently"
+          description: "No monitored host has sent fresh metrics within 5 minutes; the ingestion pipeline may be down."
