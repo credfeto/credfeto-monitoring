@@ -7,6 +7,7 @@ groups:
         expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m]))
 
       - alert: HostNotReporting
+        # 300s threshold is duplicated in ingestion.rules.yml's MetricsIngestionStalled - keep both in sync.
         expr: host:metrics_stale_seconds > 300
         for: 5m
         labels:

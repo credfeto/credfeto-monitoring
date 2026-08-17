@@ -5,7 +5,6 @@ groups:
     rules:
       - alert: ContainerRestartLooping
         expr: resets(docker_container_status_uptime_ns[15m]) > 2
-        for: 0m
         labels:
           severity: warning
         annotations:

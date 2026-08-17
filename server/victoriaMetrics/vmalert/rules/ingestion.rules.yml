@@ -4,6 +4,7 @@ groups:
     interval: 1m
     rules:
       - alert: MetricsIngestionStalled
+        # 300s threshold is duplicated in host.rules.yml's HostNotReporting - keep both in sync.
         expr: count(host:metrics_stale_seconds < 300) == 0
         for: 5m
         labels:
