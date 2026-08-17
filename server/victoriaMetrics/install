@@ -54,16 +54,21 @@ create_data_dirs_and_volumes() {
     done
 }
 
-check_env_file() {
-    if [ ! -f "${SCRIPT_DIR}/.env" ]; then
-        die "Missing ${SCRIPT_DIR}/.env - copy .env.example to .env and set GF_SECURITY_ADMIN_PASSWORD before running install."
+require_file() {
+    file="$1"
+    message="$2"
+
+    if [ ! -f "${file}" ]; then
+        die "${message}"
     fi
 }
 
+check_env_file() {
+    require_file "${SCRIPT_DIR}/.env" "Missing ${SCRIPT_DIR}/.env - copy .env.example to .env and set GF_SECURITY_ADMIN_PASSWORD before running install."
+}
+
 check_webhook_secret() {
-    if [ ! -f "${SCRIPT_DIR}/alertmanager/webhook_url" ]; then
-        die "Missing ${SCRIPT_DIR}/alertmanager/webhook_url - create it manually with the Slack/Discord chat webhook URL as its only content before running install. It is gitignored and must never be committed."
-    fi
+    require_file "${SCRIPT_DIR}/alertmanager/webhook_url" "Missing ${SCRIPT_DIR}/alertmanager/webhook_url - create it manually with the Slack/Discord chat webhook URL as its only content before running install. It is gitignored and must never be committed."
 }
 
 start_services() {

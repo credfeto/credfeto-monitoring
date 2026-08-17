@@ -1,7 +1,7 @@
 ---
 groups:
   - name: resources
-    interval: 1m
+    interval: 5m
     rules:
       - alert: DiskSpaceLow
         expr: disk_used_percent > 85
