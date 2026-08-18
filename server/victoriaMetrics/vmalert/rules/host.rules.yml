@@ -3,8 +3,12 @@ groups:
   - name: host
     interval: 1m
     rules:
+      # 24h lookback (not 30m) so this keeps recording - and HostNotReporting/
+      # MetricsIngestionStalled keep firing - for the full duration of a real
+      # outage; a short window makes the series vanish once it elapses, which
+      # silently resolves the alert while the host is still down.
       - record: host:metrics_stale_seconds
-        expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[30m]))
+        expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[24h]))
 
       - alert: HostNotReporting
         expr: host:metrics_stale_seconds > 300
