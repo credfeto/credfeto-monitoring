@@ -1,4 +1,10 @@
 ---
+global:
+  # Above the slowest vmalert rule-group interval (docker/resources: 5m) so
+  # evaluation jitter can't create a gap that exceeds this and falsely
+  # auto-resolves a still-firing alert.
+  resolve_timeout: 15m
+
 route:
   receiver: chat-webhook
   group_by: ["alertname", "host"]
