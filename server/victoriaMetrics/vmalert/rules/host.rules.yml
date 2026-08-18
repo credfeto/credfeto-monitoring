@@ -1,0 +1,32 @@
+---
+groups:
+  - name: host
+    interval: 1m
+    rules:
+      # 24h lookback (not 30m) so this keeps recording - and HostNotReporting/
+      # MetricsIngestionStalled keep firing - for the full duration of a real
+      # outage; a short window makes the series vanish once it elapses, which
+      # silently resolves the alert while the host is still down.
+      - record: host:metrics_stale_seconds
+        expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[24h]))
+
+      - alert: HostNotReporting
+        expr: host:metrics_stale_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host {{ $labels.host }} is not reporting metrics"
+          description: "No metrics have been received from host {{ $labels.host }} for over 5 minutes."
+
+      - alert: MetricsIngestionStalled
+        # count() over zero matched series returns zero output series, not a
+        # literal 0, so "== 0" alone never fires when every host is stale -
+        # `or vector(0)` supplies the fallback 0 for that empty-vector case.
+        expr: (count(host:metrics_stale_seconds < 300) or vector(0)) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No hosts have reported metrics recently"
+          description: "No monitored host has sent fresh metrics within 5 minutes; the ingestion pipeline may be down."

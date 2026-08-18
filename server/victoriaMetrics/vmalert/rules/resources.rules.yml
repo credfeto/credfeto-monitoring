@@ -1,0 +1,40 @@
+---
+groups:
+  - name: resources
+    interval: 5m
+    rules:
+      - alert: DiskSpaceLow
+        expr: disk_used_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk {{ $labels.path }} on {{ $labels.host }} is over 85% full"
+          description: "{{ $labels.path }} on {{ $labels.host }} is {{ $value | printf \"%.1f\" }}% full."
+
+      - alert: DiskWillFillWithin24Hours
+        expr: predict_linear(disk_used_percent[6h], 86400) > 100
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk {{ $labels.path }} on {{ $labels.host }} predicted to fill within 24 hours"
+          description: "Based on the trend over the last 6 hours, {{ $labels.path }} on {{ $labels.host }} is predicted to reach 100% used within 24 hours."
+
+      - alert: SustainedHighCpuUsage
+        expr: (100 - cpu_usage_idle{cpu="cpu-total"}) > 90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sustained high CPU usage on {{ $labels.host }}"
+          description: "CPU usage on {{ $labels.host }} has been above 90% for at least 15 minutes."
+
+      - alert: LowAvailableMemory
+        expr: mem_available_percent < 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low available memory on {{ $labels.host }}"
+          description: "Available memory on {{ $labels.host }} is {{ $value | printf \"%.1f\" }}%."

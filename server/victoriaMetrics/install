@@ -17,7 +17,7 @@ info() {
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Pairs of "volume-name:data-dir", optionally followed by ":uid:gid" when the
 # container runs as a non-root user that needs to own the bind-mounted dir.
-DATA_VOLUMES="victoria-metrics-data:/data/victoria-metrics grafana-data:/data/grafana:472:472"
+DATA_VOLUMES="victoria-metrics-data:/data/victoria-metrics grafana-data:/data/grafana:472:472 alertmanager-data:/data/alertmanager:65534:65534"
 
 create_data_dirs_and_volumes() {
     for pair in ${DATA_VOLUMES}; do
@@ -54,21 +54,33 @@ create_data_dirs_and_volumes() {
     done
 }
 
-check_env_file() {
-    if [ ! -f "${SCRIPT_DIR}/.env" ]; then
-        die "Missing ${SCRIPT_DIR}/.env - copy .env.example to .env and set GF_SECURITY_ADMIN_PASSWORD before running install."
+require_file() {
+    file="$1"
+    message="$2"
+
+    if [ ! -f "${file}" ]; then
+        die "${message}"
     fi
 }
 
+check_env_file() {
+    require_file "${SCRIPT_DIR}/.env" "Missing ${SCRIPT_DIR}/.env - copy .env.example to .env and set GF_SECURITY_ADMIN_PASSWORD before running install."
+}
+
+check_webhook_secret() {
+    require_file "${SCRIPT_DIR}/alertmanager/webhook_url" "Missing ${SCRIPT_DIR}/alertmanager/webhook_url - create it manually with the Slack/Discord chat webhook URL as its only content before running install. It is gitignored and must never be committed."
+}
+
 start_services() {
-    info "Starting VictoriaMetrics and Grafana..."
+    info "Starting VictoriaMetrics, Grafana, vmalert and Alertmanager..."
     sudo docker compose up -d
-    success "VictoriaMetrics and Grafana started."
+    success "VictoriaMetrics, Grafana, vmalert and Alertmanager started."
 }
 
 main() {
     cd "${SCRIPT_DIR}"
     check_env_file
+    check_webhook_secret
     create_data_dirs_and_volumes
     start_services
     success "Installation complete."

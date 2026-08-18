@@ -1,0 +1,12 @@
+---
+groups:
+  - name: docker
+    interval: 5m
+    rules:
+      - alert: ContainerRestartLooping
+        expr: resets(docker_container_status_uptime_ns[15m]) > 2
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.container_name }} on {{ $labels.host }} is restart-looping"
+          description: "Container {{ $labels.container_name }} on {{ $labels.host }} has restarted more than twice in the last 15 minutes."

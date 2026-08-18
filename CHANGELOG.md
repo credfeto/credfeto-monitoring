@@ -12,6 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 - Add Grafana as a sibling service in the VictoriaMetrics compose stack, provisioned from repo-checked-in files (VictoriaMetrics datasource, host overview and Docker containers dashboards) so metrics are visible without manual setup
+- Add vmalert and Alertmanager to the VictoriaMetrics compose stack, alerting on host outages, disk usage/predicted fill, sustained CPU load, low memory, Docker container restart loops and stalled metrics ingestion, notifying via a Slack/Discord-compatible chat webhook
 ### Fixed
 - Fixed README.md formatting to pass the markdownlint pre-commit baseline check.
 - VictoriaMetrics was bound to 127.0.0.1 only, making it unreachable from any other host on the network; changed to publish the port on all interfaces so Telegraf agents and the reverse proxy can actually reach it.

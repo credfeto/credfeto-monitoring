@@ -19,16 +19,34 @@ This repo hosts the infrastructure for a small self-hosted monitoring stack: a V
 
 ### Server: VictoriaMetrics
 
-`server/victoriaMetrics/` contains the Docker Compose stack and helper scripts for the metrics server, including a [Grafana][grafana] instance provisioned to visualise the collected metrics.
+`server/victoriaMetrics/` contains the Docker Compose stack and helper scripts for the metrics server, including a [Grafana][grafana] instance provisioned to visualise the collected metrics, and [vmalert][vmalert] plus [Alertmanager][alertmanager] to alert on them.
 
 ```sh
 cd server/victoriaMetrics
-cp .env.example .env  # first-time setup: set GF_SECURITY_ADMIN_PASSWORD
-./install              # creates the data volumes and starts the stack
-./update               # pulls the latest images and restarts the stack
+cp .env.example .env # first-time setup: set GF_SECURITY_ADMIN_PASSWORD
+echo "<webhook url>" > alertmanager/webhook_url # first-time setup: chat webhook for alert notifications
+./install # creates the data volumes and starts the stack
+./update # pulls the latest images and restarts the stack
 ```
 
 Grafana is available on port `3000` once the stack is running. Its VictoriaMetrics datasource and dashboards (host overview, Docker containers) are provisioned automatically from `server/victoriaMetrics/grafana/provisioning/`; no manual configuration is required.
+
+### Alerting
+
+`vmalert` evaluates the alerting rules in `server/victoriaMetrics/vmalert/rules/` against VictoriaMetrics and sends firing alerts to Alertmanager, which routes them to a Slack- or Discord-compatible chat webhook (Discord accepts Slack-formatted payloads via its `/slack` webhook suffix). vmalert's UI is available on port `8880`, Alertmanager's on port `9093`.
+
+The webhook URL is never committed: create `server/victoriaMetrics/alertmanager/webhook_url` on the host (a plain text file containing only the URL) before running `./install`; that path is gitignored.
+
+The starting rule set covers:
+
+- a host that has stopped reporting metrics
+- disk usage over 85%, or predicted to fill within 24 hours
+- sustained high CPU usage
+- low available memory
+- a Docker container that is restart-looping
+- the metrics ingestion pipeline stalling entirely
+
+Firing alerts do not yet surface inside Grafana; that is tracked separately in [#20][alerting-in-grafana].
 
 ### Client: Telegraf
 
@@ -56,6 +74,8 @@ See [SECURITY][security]
 
 See [LICENSE][licence]
 
+[alerting-in-grafana]: https://github.com/credfeto/credfeto-monitoring/issues/20
+[alertmanager]: https://prometheus.io/docs/alerting/latest/alertmanager/
 [changelog]: CHANGELOG.md
 [contributing]: CONTRIBUTING.md
 [grafana]: https://grafana.com/
@@ -68,3 +88,4 @@ See [LICENSE][licence]
 [security]: SECURITY.md
 [telegraf]: https://www.influxdata.com/time-series-platform/telegraf/
 [victoriametrics]: https://victoriametrics.com/
+[vmalert]: https://docs.victoriametrics.com/victoriametrics/vmalert/
