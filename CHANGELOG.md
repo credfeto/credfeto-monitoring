@@ -19,6 +19,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Telegraf install on Ubuntu/Debian failed because the InfluxData signing key it fetched had expired and no longer covered the repository's active signing subkey; now fetches the current key, verifies its fingerprint before trusting it, and self-repairs hosts left with the stale keyring.
 ### Changed
 - Rewrote README.md to describe the actual repo contents (VictoriaMetrics server and Telegraf client) instead of the leftover cs-template placeholder text.
+- SDK - Updated DotNet SDK to 10.0.400
 ### Deprecated
 ### Removed
 ### Deployment Changes
