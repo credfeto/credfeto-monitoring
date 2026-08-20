@@ -11,6 +11,16 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+### Fixed
+### Changed
+### Deprecated
+### Removed
+### Deployment Changes
+<!--
+Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
+-->
+## [0.0.3] - 2026-08-20
+### Added
 - Add Grafana as a sibling service in the VictoriaMetrics compose stack, provisioned from repo-checked-in files (VictoriaMetrics datasource, host overview and Docker containers dashboards) so metrics are visible without manual setup
 - Add vmalert and Alertmanager to the VictoriaMetrics compose stack, alerting on host outages, disk usage/predicted fill, sustained CPU load, low memory, Docker container restart loops and stalled metrics ingestion, notifying via a Slack/Discord-compatible chat webhook
 ### Fixed
@@ -20,12 +30,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Changed
 - Rewrote README.md to describe the actual repo contents (VictoriaMetrics server and Telegraf client) instead of the leftover cs-template placeholder text.
 - SDK - Updated DotNet SDK to 10.0.400
-### Deprecated
-### Removed
-### Deployment Changes
-<!--
-Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
--->
+
 ## [0.0.2] - 2026-07-16
 ### Changed
 - SDK - Updated DotNet SDK to 10.0.302
