@@ -12,13 +12,16 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 ### Fixed
+- Telegraf client config pointed at metrics.markridgwell.com, which has no DNS record, causing metrics pushes to silently fail on every host; now points at monitoring.markridgwell.com
 ### Changed
 ### Deprecated
 ### Removed
 ### Deployment Changes
+
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
 -->
+
 ## [0.0.3] - 2026-08-20
 ### Added
 - Add Grafana as a sibling service in the VictoriaMetrics compose stack, provisioned from repo-checked-in files (VictoriaMetrics datasource, host overview and Docker containers dashboards) so metrics are visible without manual setup
