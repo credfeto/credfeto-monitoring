@@ -12,9 +12,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Security
 ### Added
 ### Fixed
-- Telegraf client config pointed at metrics.markridgwell.com, which has no DNS record, causing metrics pushes to silently fail on every host; now points at monitoring.markridgwell.com
 ### Changed
-- SDK - Updated DotNet SDK to 10.0.401
 ### Deprecated
 ### Removed
 ### Deployment Changes
@@ -22,6 +20,12 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
 -->
+
+## [0.0.4] - 2026-09-17
+### Fixed
+- Telegraf client config pointed at metrics.markridgwell.com, which has no DNS record, causing metrics pushes to silently fail on every host; now points at monitoring.markridgwell.com
+### Changed
+- SDK - Updated DotNet SDK to 10.0.401
 
 ## [0.0.3] - 2026-08-20
 ### Added
