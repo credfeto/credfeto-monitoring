@@ -64,7 +64,7 @@ defaults_file_defines_opts() {
 }
 
 defaults_file_lacks_trailing_newline() {
-    [ -s "${TELEGRAF_DEFAULTS}" ] && [ -n "$(sudo tail -c 1 "${TELEGRAF_DEFAULTS}")" ]
+    [ -n "$(sudo tail -c 1 "${TELEGRAF_DEFAULTS}")" ]
 }
 
 create_empty_defaults_file() {
