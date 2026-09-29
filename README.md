@@ -55,8 +55,10 @@ Firing alerts do not yet surface inside Grafana; that is tracked separately in [
 ```sh
 cd client/Telegraf
 ./install.sh    # installs the Telegraf package (Ubuntu/Debian or Arch)
-./configure.sh  # deploys telegraf.conf and (re)starts the service
+./configure.sh  # validates and deploys telegraf.conf, then (re)starts the service
 ```
+
+`configure.sh` checks `telegraf.conf` against the installed Telegraf (`telegraf config check`, available from Telegraf 1.32) before deploying it, and stops without touching `/etc/telegraf` or the service if Telegraf rejects the configuration. Pull requests that change `client/Telegraf/` run the same check against the latest Telegraf release.
 
 ## Changelog
 
