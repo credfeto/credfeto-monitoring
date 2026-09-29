@@ -21,6 +21,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Changed
 - The Docker input now tags only the com.docker.compose.project and com.docker.compose.service container labels instead of every label, so labels that change on every recreate (such as the compose config hash) no longer grow series cardinality on each watchtower update
 - skip_processors_after_aggregators is now set explicitly in [agent] to silence Telegraf's default-change warning
+- Telegraf disk input now also ignores nsfs and efivarfs pseudo-filesystems, which have no meaningful disk-usage metrics.
 ### Deprecated
 ### Removed
 - Unused src/FunFair.props
