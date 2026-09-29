@@ -60,6 +60,10 @@ cd client/Telegraf
 
 `configure.sh` checks `telegraf.conf` against the installed Telegraf (`telegraf config check`, available from Telegraf 1.32) before deploying it, and stops without touching `/etc/telegraf` or the service if Telegraf rejects the configuration. Pull requests that change `client/Telegraf/` run the same check against the latest Telegraf release.
 
+When the installed Telegraf systemd unit reads `/etc/default/telegraf` (as the InfluxData package unit does), `configure.sh` creates that file with `TELEGRAF_OPTS=""` if it is missing, or appends `TELEGRAF_OPTS=""` if the file does not define the variable, so systemd stops warning about an unset variable on every start. An existing `TELEGRAF_OPTS` definition is never changed, and the service is restarted only when the file was created or updated.
+
+The Docker input keeps only the `com.docker.compose.project` and `com.docker.compose.service` container labels as tags; all other labels are dropped to avoid a new series every time a container is recreated.
+
 ## Changelog
 
 View [changelog][changelog]
