@@ -14,6 +14,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - configure.sh validates telegraf.conf with telegraf config check before deploying it, and a CI workflow runs the same check against the latest Telegraf release on pull requests, so removed options are caught before they break a host
 ### Fixed
 - Telegraf failed to start on hosts running Telegraf 1.38 or later because telegraf.conf used the container_names, perdevice and total options removed from inputs.docker; now uses perdevice_include and total_include
+- Fixed vmalert failing to start due to an invalid --remoteWrite.tmpDataPath flag (not supported by vmalert).
 ### Changed
 ### Deprecated
 ### Removed

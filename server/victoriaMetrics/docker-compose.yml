@@ -42,12 +42,9 @@ services:
       - "8880:8880"
     volumes:
       - ./vmalert/rules:/etc/vmalert/rules:ro
-    tmpfs:
-      - /vmalert-remotewrite-data
     command:
       - --datasource.url=http://victoriametrics:8428
       - --remoteWrite.url=http://victoriametrics:8428
-      - --remoteWrite.tmpDataPath=/vmalert-remotewrite-data
       - --remoteRead.url=http://victoriametrics:8428
       - --notifier.url=http://alertmanager:9093
       - --rule=/etc/vmalert/rules/*.yml
