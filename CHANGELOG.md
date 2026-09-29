@@ -15,12 +15,16 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Fixed
 - Telegraf failed to start on hosts running Telegraf 1.38 or later because telegraf.conf used the container_names, perdevice and total options removed from inputs.docker; now uses perdevice_include and total_include
 - Fixed vmalert failing to start due to an invalid --remoteWrite.tmpDataPath flag (not supported by vmalert).
+- configure.sh reported success and restarted Telegraf even when writing the config or defaults file failed; it now stops with an error
+- systemd warned about an unset TELEGRAF_OPTS on every Telegraf start; configure.sh now creates /etc/default/telegraf, or appends TELEGRAF_OPTS="" when the file exists but does not define it, leaving any existing definition unchanged
 ### Changed
-- TBD - to be finalized after review
+- The Docker input now tags only the com.docker.compose.project and com.docker.compose.service container labels instead of every label, so labels that change on every recreate (such as the compose config hash) no longer grow series cardinality on each watchtower update
+- skip_processors_after_aggregators is now set explicitly in [agent] to silence Telegraf's default-change warning
 ### Deprecated
 ### Removed
 - Unused src/FunFair.props
 ### Deployment Changes
+- Run client/Telegraf/configure.sh on each monitored host to apply the Telegraf config and defaults-file changes
 
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
