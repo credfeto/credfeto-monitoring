@@ -16,10 +16,17 @@ info() {
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+fix_alertmanager_config_permissions() {
+    info "Granting alertmanager (uid/gid 65534) read access to its config directory..."
+    sudo chgrp -R 65534 "${SCRIPT_DIR}/alertmanager"
+    success "alertmanager config directory permissions set."
+}
+
 main() {
     cd "${SCRIPT_DIR}"
     info "Updating repository..."
     git pull
+    fix_alertmanager_config_permissions
     info "Pulling latest images..."
     sudo docker compose pull
     info "Restarting services..."
