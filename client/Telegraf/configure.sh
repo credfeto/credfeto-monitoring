@@ -26,12 +26,27 @@ is_ai_agent() {
     [ "${CLAUDECODE:-}" = "1" ]
 }
 
-deploy_config() {
-    info "Deploying Telegraf configuration..."
+validate_config() {
+    info "Validating Telegraf configuration..."
 
     if [ ! -f "${TELEGRAF_CONF_SRC}" ]; then
         die "telegraf.conf not found at ${TELEGRAF_CONF_SRC}"
     fi
+
+    if ! command -v telegraf >/dev/null 2>&1; then
+        die "telegraf not found; run install.sh first"
+    fi
+
+    if ! check_output="$(telegraf config check --config "${TELEGRAF_CONF_SRC}" 2>&1)"; then
+        die "Telegraf rejected ${TELEGRAF_CONF_SRC}:
+${check_output}"
+    fi
+
+    success "Configuration is valid."
+}
+
+deploy_config() {
+    info "Deploying Telegraf configuration..."
 
     if cmp -s "${TELEGRAF_CONF_SRC}" "${TELEGRAF_CONF_DEST}" 2>/dev/null; then
         info "Configuration unchanged, skipping deploy."
@@ -66,6 +81,7 @@ manage_service() {
 
 main() {
     config_changed=0
+    validate_config
     deploy_config || config_changed=1
     manage_service "${config_changed}"
     success "Telegraf configuration complete."

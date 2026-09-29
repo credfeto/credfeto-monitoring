@@ -1,0 +1,42 @@
+--- # Validate the Telegraf client configuration
+name: "PR: Telegraf Config"
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "client/Telegraf/**"
+      - ".github/workflows/telegraf-config.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  validate-telegraf-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Initialise Workspace"
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: sudo chown -R "$USER:$USER" "$GITHUB_WORKSPACE"
+
+      - name: "Checkout Source"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: true
+          fetch-depth: 1
+
+      # telegraf:latest is deliberately unpinned (owner-approved exception to version pinning):
+      # hosts install the newest Telegraf release, so options it removes must fail here first.
+      - name: "Check Telegraf configuration"
+        shell: bash
+        run: |
+          docker run --rm --network none \
+            --volume "$GITHUB_WORKSPACE/client/Telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro" \
+            --entrypoint telegraf \
+            telegraf:latest \
+            config check --config /etc/telegraf/telegraf.conf
