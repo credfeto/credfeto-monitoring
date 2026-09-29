@@ -53,9 +53,7 @@ deploy_config() {
         return 0
     fi
 
-    sudo cp "${TELEGRAF_CONF_SRC}" "${TELEGRAF_CONF_DEST}"
-    sudo chown root:root "${TELEGRAF_CONF_DEST}"
-    sudo chmod 644 "${TELEGRAF_CONF_DEST}"
+    sudo install -o root -g root -m 0644 "${TELEGRAF_CONF_SRC}" "${TELEGRAF_CONF_DEST}" || die "Failed to deploy configuration to ${TELEGRAF_CONF_DEST}"
     success "Configuration deployed to ${TELEGRAF_CONF_DEST}"
     return 1
 }
