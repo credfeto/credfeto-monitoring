@@ -59,12 +59,16 @@ deploy_config() {
     return 1
 }
 
+# These run as if conditions, where set -e is suspended, so a failed sudo read
+# must die explicitly rather than be mistaken for a negative answer.
 defaults_file_defines_opts() {
-    sudo grep -Eq '^[[:space:]]*(export[[:space:]]+)?TELEGRAF_OPTS=' "${TELEGRAF_DEFAULTS}"
+    defaults_content="$(sudo cat "${TELEGRAF_DEFAULTS}")" || die "Failed to read ${TELEGRAF_DEFAULTS}"
+    printf '%s\n' "${defaults_content}" | grep -Eq '^[[:space:]]*(export[[:space:]]+)?TELEGRAF_OPTS='
 }
 
 defaults_file_lacks_trailing_newline() {
-    [ -n "$(sudo tail -c 1 "${TELEGRAF_DEFAULTS}")" ]
+    last_char="$(sudo tail -c 1 "${TELEGRAF_DEFAULTS}")" || die "Failed to read ${TELEGRAF_DEFAULTS}"
+    [ -n "${last_char}" ]
 }
 
 create_empty_defaults_file() {
