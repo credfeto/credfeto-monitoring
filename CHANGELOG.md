@@ -15,6 +15,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Fixed
 - Telegraf failed to start on hosts running Telegraf 1.38 or later because telegraf.conf used the container_names, perdevice and total options removed from inputs.docker; now uses perdevice_include and total_include
 - Fixed vmalert failing to start due to an invalid --remoteWrite.tmpDataPath flag (not supported by vmalert).
+- Fixed alertmanager crash-looping due to permission-denied reading its config; install/update scripts now grant its runtime uid/gid read access.
 ### Changed
 ### Deprecated
 ### Removed
