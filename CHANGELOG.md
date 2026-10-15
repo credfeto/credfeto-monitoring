@@ -11,6 +11,18 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+### Fixed
+### Changed
+### Deprecated
+### Removed
+### Deployment Changes
+
+<!--
+Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
+-->
+
+## [0.0.5] - 2026-10-15
+### Added
 - configure.sh validates telegraf.conf with telegraf config check before deploying it, and a CI workflow runs the same check against the latest Telegraf release on pull requests, so removed options are caught before they break a host
 ### Fixed
 - Telegraf failed to start on hosts running Telegraf 1.38 or later because telegraf.conf used the container_names, perdevice and total options removed from inputs.docker; now uses perdevice_include and total_include
@@ -23,15 +35,10 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - skip_processors_after_aggregators is now set explicitly in [agent] to silence Telegraf's default-change warning
 - Telegraf disk input now also ignores nsfs and efivarfs pseudo-filesystems, which have no meaningful disk-usage metrics.
 - SDK - Updated DotNet SDK to 10.0.402
-### Deprecated
 ### Removed
 - Unused src/FunFair.props
 ### Deployment Changes
 - Run client/Telegraf/configure.sh on each monitored host to apply the Telegraf config and defaults-file changes
-
-<!--
-Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
--->
 
 ## [0.0.4] - 2026-09-17
 ### Fixed
