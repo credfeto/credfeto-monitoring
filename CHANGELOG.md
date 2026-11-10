@@ -15,7 +15,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Changed
 ### Deprecated
 ### Removed
-- TBD - to be finalized after review
+- Unused .NET template scaffolding removed: src/global.json, the src/Credfeto.Template.slnx solution and its .DotSettings file are no longer present, as nothing in the repository needs them
 ### Deployment Changes
 
 <!--
