@@ -78,9 +78,9 @@ fix_alertmanager_config_permissions() {
 }
 
 start_services() {
-    info "Starting VictoriaMetrics, Grafana, vmalert and Alertmanager..."
+    info "Starting VictoriaMetrics, Grafana, vmalert, Alertmanager and the MCP servers..."
     sudo docker compose up -d
-    success "VictoriaMetrics, Grafana, vmalert and Alertmanager started."
+    success "VictoriaMetrics, Grafana, vmalert, Alertmanager and the MCP servers started."
 }
 
 main() {
