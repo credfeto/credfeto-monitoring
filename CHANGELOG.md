@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- Add VictoriaMetrics and Grafana MCP servers to the monitoring stack (#45)
 ### Fixed
 ### Changed
 ### Deprecated
