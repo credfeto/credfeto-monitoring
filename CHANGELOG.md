@@ -11,7 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
-- Add VictoriaMetrics and Grafana MCP servers to the monitoring stack (#45)
+- Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
 ### Fixed
 ### Changed
 ### Deprecated

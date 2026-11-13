@@ -66,6 +66,38 @@ services:
     <<: *hardened
     restart: unless-stopped
 
+  mcp-victoriametrics:
+    image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.21.0
+    container_name: mcp-victoriametrics
+    depends_on:
+      - victoriametrics
+    ports:
+      - "8081:8081"
+    environment:
+      VM_INSTANCE_ENTRYPOINT: http://victoriametrics:8428
+      VM_INSTANCE_TYPE: single
+      MCP_SERVER_MODE: http
+      MCP_LISTEN_ADDR: ":8081"
+    <<: *hardened
+    restart: unless-stopped
+
+  mcp-grafana:
+    image: grafana/mcp-grafana:2.3.0
+    container_name: mcp-grafana
+    depends_on:
+      - grafana
+    ports:
+      - "8082:8000"
+    environment:
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_SERVICE_ACCOUNT_TOKEN: ${GRAFANA_SERVICE_ACCOUNT_TOKEN}
+    command:
+      - --transport=streamable-http
+      - --address=0.0.0.0:8000
+      - --disable-write
+    <<: *hardened
+    restart: unless-stopped
+
 volumes:
   victoria-metrics-data:
     external: true
