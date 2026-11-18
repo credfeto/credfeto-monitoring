@@ -13,6 +13,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Added
 - Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
 ### Fixed
+- mcp-grafana rejected every request with "forbidden: host not allowed" because its Host allowlist defaults to loopback on the container port; it now takes the allowed Host values from MCP_GRAFANA_ALLOWED_HOSTS (default localhost:8082,127.0.0.1:8082)
 ### Changed
 ### Deprecated
 ### Removed
