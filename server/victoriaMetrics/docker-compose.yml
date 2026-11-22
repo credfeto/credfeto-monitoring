@@ -7,6 +7,19 @@ x-hardened: &hardened
   read_only: true
 
 services:
+  # Keeps the :latest images (the MCP servers) up to date. Pinned images are
+  # left alone: Watchtower only pulls a newer image for the same tag.
+  watchtower:
+    image: nickfedor/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+    environment:
+      WATCHTOWER_NOTIFICATIONS_HOSTNAME: monitoring
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "${WATCHTOWER_SCHEDULE:-0 17 * * * *}"
+
   victoriametrics:
     image: victoriametrics/victoria-metrics:v1.111.0
     container_name: victoriametrics
@@ -91,7 +104,7 @@ services:
     restart: unless-stopped
 
   mcp-victoriametrics:
-    image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.21.0
+    image: ghcr.io/victoriametrics/mcp-victoriametrics:latest
     container_name: mcp-victoriametrics
     depends_on:
       - victoriametrics
@@ -108,7 +121,7 @@ services:
     restart: unless-stopped
 
   mcp-victorialogs:
-    image: ghcr.io/victoriametrics/mcp-victorialogs:v1.10.0
+    image: ghcr.io/victoriametrics/mcp-victorialogs:latest
     container_name: mcp-victorialogs
     depends_on:
       - victorialogs
@@ -126,7 +139,7 @@ services:
     restart: unless-stopped
 
   mcp-grafana:
-    image: grafana/mcp-grafana:2.3.0
+    image: grafana/mcp-grafana:latest
     container_name: mcp-grafana
     depends_on:
       - grafana

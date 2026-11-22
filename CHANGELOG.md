@@ -25,6 +25,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - HostNotReporting could never fire: host:metrics_stale_seconds used timestamp(last_over_time(...)), which VictoriaMetrics evaluates to the query time, so staleness was always about 0; it now uses tlast_over_time, the timestamp of the last raw sample
 - mcp-grafana rejected every request with "forbidden: host not allowed" because its Host allowlist defaults to loopback on the container port; it now takes the allowed Host values from MCP_GRAFANA_ALLOWED_HOSTS (default localhost:8082,127.0.0.1:8082)
 ### Changed
+- The three MCP servers (mcp-victoriametrics, mcp-victorialogs, mcp-grafana) use `:latest` images, and the stack now runs Watchtower (hourly, `WATCHTOWER_SCHEDULE`, default `0 17 * * * *`) to keep them up to date; pinned images are unaffected
 ### Deprecated
 ### Removed
 - Unused .NET template scaffolding removed: src/global.json, the src/Credfeto.Template.slnx solution and its .DotSettings file are no longer present, as nothing in the repository needs them

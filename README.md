@@ -88,7 +88,9 @@ To connect a client, add each endpoint as a streamable HTTP MCP server. For exam
 
 Each endpoint requires a bearer token: clients must send `Authorization: Bearer <token>`, and requests without the right token are rejected with `401` before any tool runs. The tokens are set in `.env` (`MCP_VICTORIAMETRICS_AUTH_TOKEN`, `MCP_GRAFANA_SERVER_TOKEN`, `MCP_VICTORIALOGS_AUTH_TOKEN`); generate each with `openssl rand -hex 32`. `docker compose` refuses to start the stack while any of them is unset. Health and metrics paths (`/health/*`, `/metrics`) stay unauthenticated.
 
-`mcp-victorialogs` v1.10.0 does not support `MCP_AUTH_TOKEN` yet (it is on upstream `main`), so port 8083 stays open to anyone who can reach it until the image is updated to a release that includes it. No configuration change is needed then.
+`mcp-victorialogs` v1.10.0 does not support `MCP_AUTH_TOKEN` yet (it is on upstream `main`), so port 8083 stays open to anyone who can reach it until a release that includes it is out. No configuration change is needed then: the MCP servers use `:latest` images and Watchtower picks up the new release.
+
+The stack runs Watchtower to keep the `:latest` images (the three MCP servers) up to date. It checks hourly (default `0 17 * * * *`, override with `WATCHTOWER_SCHEDULE` in `.env`, a 6-field cron with seconds first). Images pinned to a version are left alone, because Watchtower only pulls a newer image for the same tag.
 
 The tokens only control who may use the MCP servers. `mcp-victoriametrics` has full query access to every metric and `mcp-victorialogs` to every log line (VictoriaMetrics and VictoriaLogs themselves have no authentication), and `mcp-grafana` has whatever the Grafana service account below allows. `mcp-grafana` also runs with `--disable-write`, so it offers no tools that create or change anything in Grafana. The traffic is plain HTTP, so keep the ports on the LAN only and put TLS in front (a reverse proxy) for anything that crosses an untrusted network.
 
