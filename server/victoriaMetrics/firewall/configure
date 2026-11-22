@@ -37,6 +37,12 @@ info() {
 
 [ "$(id -u)" -eq 0 ] || die "must run as root"
 
+# One run at a time: monitoring-firewall-sync.timer can fire while ./update (or
+# a manual run) is still configuring, and concurrent firewall-cmd changes would
+# trip over each other.
+exec 9> /run/lock/credfeto-monitoring-firewall.lock
+flock 9
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/../.env"
 

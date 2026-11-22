@@ -19,6 +19,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - VictoriaLogs (v1.54.0) in the VictoriaMetrics stack as the central log store: syslog (RFC 3164/5424) on port 514 TCP/UDP and the HTTP API on 9428, data in a new `victoria-logs-data` volume (`/data/victoria-logs`), retention via `VICTORIALOGS_RETENTION` (default 30d), plus a provisioned Grafana `VictoriaLogs` datasource (victoriametrics-logs-datasource 0.34.0). Receiving side for centralised syslog (credfeto/credfeto-setup-arch-vm#234)
 - Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
 ### Fixed
+- `firewall/configure` takes a lock, so the firewall sync timer and `./update` can no longer configure the firewall at the same time
 - DiskWillFillWithin24Hours fired on hosts only 33-40% full after a reboot: a reboot can flip telegraf's `mode` label and start a new series, and predict_linear over minutes of post-boot data extrapolated past 100%; the rule now ignores `mode`, needs 6h of history, only fires above 50% used, and waits 1h
 - `./update` now reloads vmalert (SIGHUP) after updating, so changed alert rules take effect straight away instead of at the next container restart
 - `./update` re-runs itself after `git pull`, so changes to the update script take effect on the same run instead of the next one
