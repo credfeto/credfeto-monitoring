@@ -83,6 +83,13 @@ start_services() {
     success "VictoriaMetrics, Grafana, vmalert, Alertmanager and the MCP servers started."
 }
 
+# Ingress/egress lockdown (firewalld policies); observation mode unless
+# MONITORING_FIREWALL_ENFORCE=true in .env. Runs after the containers exist,
+# because Docker creates the docker zone the policies refer to.
+configure_firewall() {
+    sudo "${SCRIPT_DIR}/firewall/configure"
+}
+
 main() {
     cd "${SCRIPT_DIR}"
     check_env_file
@@ -90,6 +97,7 @@ main() {
     create_data_dirs_and_volumes
     fix_alertmanager_config_permissions
     start_services
+    configure_firewall
     success "Installation complete."
 }
 

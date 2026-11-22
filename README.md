@@ -101,6 +101,30 @@ The tokens only control who may use the MCP servers. `mcp-victoriametrics` has f
 3. On the new service account, select **Add service account token**, generate a token and copy it (it is shown only once).
 4. Set `GRAFANA_SERVICE_ACCOUNT_TOKEN` in `.env` to the token, then recreate the container with `sudo docker compose up -d mcp-grafana`.
 
+### Firewall
+
+`./update` (and `./install`) run `firewall/configure`, which locks the host down for ingress and egress:
+
+| Filter                                | Traffic                     | Allowed                                                                                                                                                                                                                                                      |
+|---------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `mon_ingress` (nftables)              | LAN -> published ports      | syslog (514) and the VictoriaLogs ingest (9428) from the internal networks; Grafana (3000), metrics ingest (8428) and the MCP servers (8081-8083) from the reverse proxies only                                                                                 |
+| `mon-egress` (firewalld policy)        | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies (Docker Hub mirror, pacman cache, metrics and log shipping), GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats and the Arch WKD, ICMP                                  |
+| `mon-egress-docker` (firewalld policy) | containers -> outside world | DNS, HTTPS to the proxies, Discord (Alertmanager), grafana.com (Grafana), Docker Hub and ghcr.io (Watchtower)                                                                                                                                                 |
+
+SSH to the host is left to the host's base configuration.
+
+Ingress is an nftables table of its own (`firewall/ingress.nft.template`, loaded by `monitoring-ingress-firewall.service` before Docker starts) rather than a firewalld policy, because Docker translates published ports itself and firewalld accepts all translated traffic before its policies run. The table only looks at new connections to published ports and matches the published port number.
+
+Destinations without a stable address are firewalld ipsets that `monitoring-egress-refresh.timer` refreshes every 10 minutes: names resolved from DNS, plus GitHub's and Cloudflare's published ranges (`firewall/github-egress-ranges` and `firewall/cloudflare-egress-ranges`, regenerated on a workstation with the matching `firewall/update-*-egress-ranges` script). Cloudflare is allowed as a whole range because it fronts Discord and Docker Hub's image CDN and rotates their addresses too fast for resolved addresses to keep up.
+
+`MONITORING_FIREWALL_ENFORCE` in `.env` is the only switch. Unset or anything other than `true` is observation mode: every rule is in place, but traffic that matches none of them still flows and is logged with the prefix `mon-ingress-unmatched:`, `mon-egress-unmatched:` or `mon-egress-docker-unmatched:` (rate-limited to 30 a minute). Run in observation mode first and check the journal for anything legitimate that is not covered:
+
+```sh
+sudo journalctl -k --since -1d | grep -E 'mon-[a-z-]+-unmatched'
+```
+
+then set `MONITORING_FIREWALL_ENFORCE=true` and run `./update` to drop everything else.
+
 ### Client: Telegraf
 
 `client/Telegraf/` contains the install and configuration scripts for the Telegraf agent deployed to each monitored host.
