@@ -33,6 +33,10 @@ services:
       - --retentionPeriod=${VICTORIALOGS_RETENTION:-30d}
       - --syslog.listenAddr.tcp=:5140
       - --syslog.listenAddr.udp=:5140
+      # Record the sender as remote_ip: several senders (e.g. every Technitium
+      # node, which reports the hostname "dns-server") share a syslog hostname.
+      - --syslog.useRemoteIP.tcp=true
+      - --syslog.useRemoteIP.udp=true
     <<: *hardened
     restart: unless-stopped
 

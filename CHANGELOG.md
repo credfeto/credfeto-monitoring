@@ -11,6 +11,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ## [Unreleased]
 ### Security
 ### Added
+- VictoriaLogs records the sender address of every syslog message as `remote_ip` (`-syslog.useRemoteIP.tcp/udp`), so senders that share a syslog hostname (all Technitium nodes report "dns-server") can be told apart
 - mcp-victorialogs (v1.10.0) MCP server in the VictoriaMetrics stack, backed by VictoriaLogs and exposed on the LAN at port 8083 (`/mcp`, streamable HTTP), so AI assistants can search and summarise the central logs
 - VictoriaLogs (v1.54.0) in the VictoriaMetrics stack as the central log store: syslog (RFC 3164/5424) on port 514 TCP/UDP and the HTTP API on 9428, data in a new `victoria-logs-data` volume (`/data/victoria-logs`), retention via `VICTORIALOGS_RETENTION` (default 30d), plus a provisioned Grafana `VictoriaLogs` datasource (victoriametrics-logs-datasource 0.34.0). Receiving side for centralised syslog (credfeto/credfeto-setup-arch-vm#234)
 - Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
