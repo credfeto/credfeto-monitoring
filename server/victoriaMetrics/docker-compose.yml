@@ -19,12 +19,32 @@ services:
       - --retentionPeriod=12
     restart: unless-stopped
 
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.54.0
+    container_name: victorialogs
+    ports:
+      - "9428:9428"
+      - "514:5140/tcp"
+      - "514:5140/udp"
+    volumes:
+      - victoria-logs-data:/vlogs
+    command:
+      - --storageDataPath=/vlogs
+      - --retentionPeriod=${VICTORIALOGS_RETENTION:-30d}
+      - --syslog.listenAddr.tcp=:5140
+      - --syslog.listenAddr.udp=:5140
+    <<: *hardened
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:13.1.3
     container_name: grafana
     depends_on:
       - victoriametrics
+      - victorialogs
     env_file: .env
+    environment:
+      GF_PLUGINS_PREINSTALL: victoriametrics-logs-datasource@0.34.0
     ports:
       - "3000:3000"
     volumes:
@@ -101,6 +121,8 @@ services:
 
 volumes:
   victoria-metrics-data:
+    external: true
+  victoria-logs-data:
     external: true
   grafana-data:
     external: true

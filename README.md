@@ -29,6 +29,10 @@ echo "<webhook url>" > alertmanager/webhook_url # first-time setup: chat webhook
 ./update # pulls the latest images and restarts the stack
 ```
 
+### Logs (VictoriaLogs)
+
+[VictoriaLogs][victorialogs] stores logs for the whole network. It accepts syslog (RFC 3164 and RFC 5424) on port `514` TCP and UDP, so OPNsense, the MikroTik switches, the Zyxel APs, the Technitium Log Exporter app and journald forwarders can all send to it, and its HTTP API (including the native and Loki/Elasticsearch-compatible ingestion endpoints) is on port `9428`. Data lives in the `victoria-logs-data` volume (`/data/victoria-logs`); retention is `VICTORIALOGS_RETENTION` in `.env` (default `30d`). Grafana gets a provisioned `VictoriaLogs` datasource (plugin `victoriametrics-logs-datasource`). Like VictoriaMetrics, VictoriaLogs has no authentication, so keep ports `514` and `9428` LAN-only. After upgrading an existing install, run `./install` once (it is idempotent) to create the new data volume.
+
 Grafana is available on port `3000` once the stack is running. Its VictoriaMetrics datasource and dashboards (host overview, Docker containers) are provisioned automatically from `server/victoriaMetrics/grafana/provisioning/`; no manual configuration is required.
 
 ### Alerting
@@ -125,3 +129,4 @@ See [LICENSE][licence]
 [telegraf]: https://www.influxdata.com/time-series-platform/telegraf/
 [victoriametrics]: https://victoriametrics.com/
 [vmalert]: https://docs.victoriametrics.com/victoriametrics/vmalert/
+[victorialogs]: https://docs.victoriametrics.com/victorialogs/
