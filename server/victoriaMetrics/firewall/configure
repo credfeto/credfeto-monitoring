@@ -264,4 +264,20 @@ systemctl restart monitoring-egress-refresh.timer
 # Populate the ipsets now rather than at the timer's first run.
 /usr/local/bin/monitoring-refresh-egress-ipsets
 
+# --- Keep the firewall in step with the repo (like sync-zones on the DNS
+# servers): firewall/sync pulls and re-runs this script when the firewall
+# config changes, e.g. the daily egress-ranges commit. A symlink, so the script
+# finds the checkout it lives in.
+ln -sfn "${SCRIPT_DIR}/sync" /usr/local/sbin/monitoring-firewall-sync
+install -m 644 "${SCRIPT_DIR}/monitoring-firewall-sync.service" /etc/systemd/system/monitoring-firewall-sync.service
+install -m 644 "${SCRIPT_DIR}/monitoring-firewall-sync.timer" /etc/systemd/system/monitoring-firewall-sync.timer
+systemctl daemon-reload
+systemctl enable monitoring-firewall-sync.timer > /dev/null 2>&1
+systemctl restart monitoring-firewall-sync.timer
+
+# Record the commit whose firewall config is now live; firewall/sync compares
+# against it. Keep the path in sync with firewall/sync.
+install -d -m 755 /var/lib/credfeto-monitoring
+git -C "${SCRIPT_DIR}" rev-parse HEAD > /var/lib/credfeto-monitoring/firewall-applied-head
+
 info "Firewall configured (policy target ${TARGET})."

@@ -125,6 +125,8 @@ sudo journalctl -k --since -1d | grep -E 'mon-[a-z-]+-unmatched'
 
 then set `MONITORING_FIREWALL_ENFORCE=true` and run `./update` to drop everything else.
 
+The firewall keeps itself in step with the repo, like the zone sync on the DNS servers: `monitoring-firewall-sync.timer` (every 15 minutes) refreshes the ipsets, pulls the checkout and re-runs `firewall/configure` when anything under `server/victoriaMetrics/firewall/` changed since the commit it last applied. Container and compose changes still wait for `./update`. The `Repo: Update egress ranges` workflow regenerates the GitHub and Cloudflare range files daily and commits any change to main, refusing a list that has shrunk by more than a fifth, so new ranges reach the host within a day without anyone running anything.
+
 ### Client: Telegraf
 
 `client/Telegraf/` contains the install and configuration scripts for the Telegraf agent deployed to each monitored host.
