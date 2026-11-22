@@ -54,12 +54,13 @@ Firing alerts do not yet surface inside Grafana; that is tracked separately in [
 
 ### MCP servers
 
-The stack runs two [Model Context Protocol][mcp] servers so an AI client can query the monitoring data directly. Both use the streamable HTTP transport:
+The stack runs three [Model Context Protocol][mcp] servers so an AI client can query the monitoring data directly. All use the streamable HTTP transport:
 
 | Service               | Host port | Endpoint                   | Backed by                                 |
 |-----------------------|-----------|----------------------------|-------------------------------------------|
 | `mcp-victoriametrics` | `8081`    | `http://<host>:8081/mcp`   | VictoriaMetrics (queries, series, labels) |
 | `mcp-grafana`         | `8082`    | `http://<host>:8082/mcp`   | Grafana (dashboards, datasources, alerts) |
+| `mcp-victorialogs`    | `8083`    | `http://<host>:8083/mcp`   | VictoriaLogs (log search, stats, streams) |
 
 To connect a client, add each endpoint as a streamable HTTP MCP server. For example, in a client that reads an `mcpServers` JSON configuration:
 
@@ -67,12 +68,13 @@ To connect a client, add each endpoint as a streamable HTTP MCP server. For exam
 {
   "mcpServers": {
     "victoriametrics": { "type": "http", "url": "http://<host>:8081/mcp" },
-    "grafana": { "type": "http", "url": "http://<host>:8082/mcp" }
+    "grafana": { "type": "http", "url": "http://<host>:8082/mcp" },
+    "victorialogs": { "type": "http", "url": "http://<host>:8083/mcp" }
   }
 }
 ```
 
-Neither endpoint has any authentication. Anyone who can reach the ports can use them: `mcp-victoriametrics` has full query access to every metric (VictoriaMetrics itself has no authentication), and `mcp-grafana` has whatever the Grafana service account below allows. `mcp-grafana` also runs with `--disable-write`, so it offers no tools that create or change anything in Grafana. Keep both ports on the LAN only; they are not published through Traefik or the Cloudflare Tunnel.
+None of the endpoints has any authentication. Anyone who can reach the ports can use them: `mcp-victoriametrics` has full query access to every metric and `mcp-victorialogs` to every log line (VictoriaMetrics and VictoriaLogs themselves have no authentication), and `mcp-grafana` has whatever the Grafana service account below allows. `mcp-grafana` also runs with `--disable-write`, so it offers no tools that create or change anything in Grafana. Keep the ports on the LAN only; they are not published through Traefik or the Cloudflare Tunnel.
 
 `mcp-grafana` authenticates to Grafana with a service account token from `GRAFANA_SERVICE_ACCOUNT_TOKEN` in `.env`. Grafana provisioning does not create the account, so on first setup:
 

@@ -101,6 +101,20 @@ services:
     <<: *hardened
     restart: unless-stopped
 
+  mcp-victorialogs:
+    image: ghcr.io/victoriametrics/mcp-victorialogs:v1.10.0
+    container_name: mcp-victorialogs
+    depends_on:
+      - victorialogs
+    ports:
+      - "8083:8083"
+    environment:
+      VL_INSTANCE_ENTRYPOINT: http://victorialogs:9428
+      MCP_SERVER_MODE: http
+      MCP_LISTEN_ADDR: ":8083"
+    <<: *hardened
+    restart: unless-stopped
+
   mcp-grafana:
     image: grafana/mcp-grafana:2.3.0
     container_name: mcp-grafana
