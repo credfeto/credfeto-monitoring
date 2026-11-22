@@ -24,8 +24,13 @@ fix_alertmanager_config_permissions() {
 
 main() {
     cd "${SCRIPT_DIR}"
-    info "Updating repository..."
-    git pull
+    if [ "${UPDATE_ALREADY_PULLED:-}" != "1" ]; then
+        info "Updating repository..."
+        git pull
+        # sh has already parsed this script, so changes git pull just made to
+        # it would not run until next time. Re-run the freshly pulled copy.
+        UPDATE_ALREADY_PULLED=1 exec "${SCRIPT_DIR}/update"
+    fi
     fix_alertmanager_config_permissions
     info "Pulling latest images..."
     sudo docker compose pull
@@ -36,6 +41,10 @@ main() {
     # `up -d` keeps the stale config. Recreate it so config changes apply.
     info "Recreating alertmanager to pick up its config file..."
     sudo docker compose up -d --force-recreate --no-deps alertmanager
+    # vmalert only reads its rule files at start-up or on SIGHUP, so rule
+    # changes pulled above would otherwise wait for the next container restart.
+    info "Reloading vmalert rules..."
+    sudo docker compose kill -s SIGHUP vmalert
     success "Update complete."
 }
 

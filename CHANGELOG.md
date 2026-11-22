@@ -15,6 +15,8 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
 ### Fixed
 - DiskWillFillWithin24Hours fired on hosts only 33-40% full after a reboot: a reboot can flip telegraf's `mode` label and start a new series, and predict_linear over minutes of post-boot data extrapolated past 100%; the rule now ignores `mode`, needs 6h of history, only fires above 50% used, and waits 1h
+- `./update` now reloads vmalert (SIGHUP) after updating, so changed alert rules take effect straight away instead of at the next container restart
+- `./update` re-runs itself after `git pull`, so changes to the update script take effect on the same run instead of the next one
 - `./update` now recreates alertmanager, because its single-file config bind mount kept the old alertmanager.yml after `git pull` (a reload did not pick up changes)
 - Alertmanager never delivered a notification: the receiver used slack_configs against a Discord webhook, which Discord rejected with 400 {"attachments": ["0"]} on every send; it now uses the native discord_configs (webhook_url_file unchanged) with a firing/resolved title and per-alert summary and description
 - HostNotReporting could never fire: host:metrics_stale_seconds used timestamp(last_over_time(...)), which VictoriaMetrics evaluates to the query time, so staleness was always about 0; it now uses tlast_over_time, the timestamp of the last raw sample
