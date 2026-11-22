@@ -10,6 +10,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 
 ## [Unreleased]
 ### Security
+- The MCP servers now require a bearer token (`Authorization: Bearer <token>`): mcp-victoriametrics via `MCP_AUTH_TOKEN` and mcp-grafana via `MCP_GRAFANA_SERVER_TOKEN`; requests without the token get 401. mcp-victorialogs is configured the same way, but v1.10.0 does not enforce it yet; it will from the first upstream release that supports `MCP_AUTH_TOKEN`
 ### Added
 - VictoriaLogs records the sender address of every syslog message as `remote_ip` (`-syslog.useRemoteIP.tcp/udp`), so senders that share a syslog hostname (all Technitium nodes report "dns-server") can be told apart
 - mcp-victorialogs (v1.10.0) MCP server in the VictoriaMetrics stack, backed by VictoriaLogs and exposed on the LAN at port 8083 (`/mcp`, streamable HTTP), so AI assistants can search and summarise the central logs
@@ -28,6 +29,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Removed
 - Unused .NET template scaffolding removed: src/global.json, the src/Credfeto.Template.slnx solution and its .DotSettings file are no longer present, as nothing in the repository needs them
 ### Deployment Changes
+- Before updating, add `MCP_VICTORIAMETRICS_AUTH_TOKEN`, `MCP_VICTORIALOGS_AUTH_TOKEN` and `MCP_GRAFANA_SERVER_TOKEN` to `.env` (`openssl rand -hex 32` each); `docker compose` refuses to start the stack without them. Then add the matching `Authorization: Bearer <token>` header to every MCP client
 
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch

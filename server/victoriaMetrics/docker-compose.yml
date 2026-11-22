@@ -102,6 +102,8 @@ services:
       VM_INSTANCE_TYPE: single
       MCP_SERVER_MODE: http
       MCP_LISTEN_ADDR: ":8081"
+      # Callers must send "Authorization: Bearer <token>" (401 otherwise).
+      MCP_AUTH_TOKEN: ${MCP_VICTORIAMETRICS_AUTH_TOKEN:?set MCP_VICTORIAMETRICS_AUTH_TOKEN in .env}
     <<: *hardened
     restart: unless-stopped
 
@@ -116,6 +118,10 @@ services:
       VL_INSTANCE_ENTRYPOINT: http://victorialogs:9428
       MCP_SERVER_MODE: http
       MCP_LISTEN_ADDR: ":8083"
+      # Callers must send "Authorization: Bearer <token>". mcp-victorialogs
+      # v1.10.0 ignores this (support is on upstream main, not yet released);
+      # it is enforced from the first release that includes it.
+      MCP_AUTH_TOKEN: ${MCP_VICTORIALOGS_AUTH_TOKEN:?set MCP_VICTORIALOGS_AUTH_TOKEN in .env}
     <<: *hardened
     restart: unless-stopped
 
@@ -129,6 +135,10 @@ services:
     environment:
       GRAFANA_URL: http://grafana:3000
       GRAFANA_SERVICE_ACCOUNT_TOKEN: ${GRAFANA_SERVICE_ACCOUNT_TOKEN}
+      # Caller auth: requests without "Authorization: Bearer <token>" get 401.
+      # Set via the environment rather than --server-auth-token so the secret
+      # is not visible in the process arguments.
+      MCP_GRAFANA_SERVER_TOKEN: ${MCP_GRAFANA_SERVER_TOKEN:?set MCP_GRAFANA_SERVER_TOKEN in .env}
     command:
       - --transport=streamable-http
       - --address=0.0.0.0:8000

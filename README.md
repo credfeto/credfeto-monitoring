@@ -67,14 +67,30 @@ To connect a client, add each endpoint as a streamable HTTP MCP server. For exam
 ```json
 {
   "mcpServers": {
-    "victoriametrics": { "type": "http", "url": "http://<host>:8081/mcp" },
-    "grafana": { "type": "http", "url": "http://<host>:8082/mcp" },
-    "victorialogs": { "type": "http", "url": "http://<host>:8083/mcp" }
+    "victoriametrics": {
+      "type": "http",
+      "url": "http://<host>:8081/mcp",
+      "headers": { "Authorization": "Bearer <MCP_VICTORIAMETRICS_AUTH_TOKEN>" }
+    },
+    "grafana": {
+      "type": "http",
+      "url": "http://<host>:8082/mcp",
+      "headers": { "Authorization": "Bearer <MCP_GRAFANA_SERVER_TOKEN>" }
+    },
+    "victorialogs": {
+      "type": "http",
+      "url": "http://<host>:8083/mcp",
+      "headers": { "Authorization": "Bearer <MCP_VICTORIALOGS_AUTH_TOKEN>" }
+    }
   }
 }
 ```
 
-None of the endpoints has any authentication. Anyone who can reach the ports can use them: `mcp-victoriametrics` has full query access to every metric and `mcp-victorialogs` to every log line (VictoriaMetrics and VictoriaLogs themselves have no authentication), and `mcp-grafana` has whatever the Grafana service account below allows. `mcp-grafana` also runs with `--disable-write`, so it offers no tools that create or change anything in Grafana. Keep the ports on the LAN only; they are not published through Traefik or the Cloudflare Tunnel.
+Each endpoint requires a bearer token: clients must send `Authorization: Bearer <token>`, and requests without the right token are rejected with `401` before any tool runs. The tokens are set in `.env` (`MCP_VICTORIAMETRICS_AUTH_TOKEN`, `MCP_GRAFANA_SERVER_TOKEN`, `MCP_VICTORIALOGS_AUTH_TOKEN`); generate each with `openssl rand -hex 32`. `docker compose` refuses to start the stack while any of them is unset. Health and metrics paths (`/health/*`, `/metrics`) stay unauthenticated.
+
+`mcp-victorialogs` v1.10.0 does not support `MCP_AUTH_TOKEN` yet (it is on upstream `main`), so port 8083 stays open to anyone who can reach it until the image is updated to a release that includes it. No configuration change is needed then.
+
+The tokens only control who may use the MCP servers. `mcp-victoriametrics` has full query access to every metric and `mcp-victorialogs` to every log line (VictoriaMetrics and VictoriaLogs themselves have no authentication), and `mcp-grafana` has whatever the Grafana service account below allows. `mcp-grafana` also runs with `--disable-write`, so it offers no tools that create or change anything in Grafana. The traffic is plain HTTP, so keep the ports on the LAN only and put TLS in front (a reverse proxy) for anything that crosses an untrusted network.
 
 `mcp-grafana` authenticates to Grafana with a service account token from `GRAFANA_SERVICE_ACCOUNT_TOKEN` in `.env`. Grafana provisioning does not create the account, so on first setup:
 
