@@ -8,7 +8,11 @@ groups:
       # outage; a short window makes the series vanish once it elapses, which
       # silently resolves the alert while the host is still down.
       - record: host:metrics_stale_seconds
-        expr: time() - timestamp(last_over_time(cpu_usage_idle{cpu="cpu-total"}[24h]))
+        # tlast_over_time returns the timestamp of the last raw sample in the
+        # window. timestamp(last_over_time(...)) returns the evaluation time in
+        # VictoriaMetrics, so the old expression was always ~0 and
+        # HostNotReporting could never fire.
+        expr: time() - tlast_over_time(cpu_usage_idle{cpu="cpu-total"}[24h])
 
       - alert: HostNotReporting
         expr: host:metrics_stale_seconds > 300
