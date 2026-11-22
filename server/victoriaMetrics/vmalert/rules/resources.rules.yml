@@ -13,8 +13,17 @@ groups:
           description: "{{ $labels.path }} on {{ $labels.host }} is {{ $value | printf \"%.1f\" }}% full."
 
       - alert: DiskWillFillWithin24Hours
-        expr: predict_linear(disk_used_percent[6h], 86400) > 100
-        for: 30m
+        # Telegraf's `mode` label (rw/ro) can flip across a reboot, which
+        # starts a brand-new series; predict_linear over a series only minutes
+        # old extrapolates the post-boot churn (image pulls, log replay) to
+        # >100% (seen after the 2026-11-22 rolling Proxmox reboot on hosts at
+        # 33-40% used). So: ignore `mode`, require a full 6h of history, and
+        # only fire on disks that are already at least half full.
+        expr: |
+          max without (mode) (predict_linear(disk_used_percent[6h], 86400)) > 100
+            and max without (mode) (disk_used_percent offset 6h) > 0
+            and max without (mode) (disk_used_percent) > 50
+        for: 1h
         labels:
           severity: warning
         annotations:

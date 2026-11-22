@@ -31,6 +31,11 @@ main() {
     sudo docker compose pull
     info "Restarting services..."
     sudo docker compose up -d --remove-orphans
+    # alertmanager.yml is a single-file bind mount: git pull replaces the file,
+    # so the running container keeps the old inode and a reload or a plain
+    # `up -d` keeps the stale config. Recreate it so config changes apply.
+    info "Recreating alertmanager to pick up its config file..."
+    sudo docker compose up -d --force-recreate --no-deps alertmanager
     success "Update complete."
 }
 
