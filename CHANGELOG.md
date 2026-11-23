@@ -10,6 +10,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 
 ## [Unreleased]
 ### Security
+- Firewall: the reverse proxies' Servers VLAN addresses (`192.168.150.250`, `192.168.150.251`, `2a02:8010:61d5:150::250`, `2a02:8010:61d5:150::251`) are no longer allowed; proxy-01/proxy-02 are only reached on their DMZ VLAN addresses
 - Firewall: the reverse proxies' DMZ VLAN addresses (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250`, `2a02:8010:61d5:140::251`) are allowed alongside their Servers VLAN addresses, so proxy-01/proxy-02 can move to the DMZ one at a time without losing access
 - Host firewall lockdown for ingress and egress (`firewall/configure`, run by `./update` and `./install`): an nftables table limits who may reach the published container ports (syslog and log ingest from the LAN; Grafana, metrics ingest and the MCP servers from the reverse proxies only), and firewalld policies limit what the host and the containers may connect to, with CDN-fronted destinations kept in ipsets refreshed every 10 minutes. Observation mode (log unmatched traffic, drop nothing) until `MONITORING_FIREWALL_ENFORCE=true`
 - The MCP servers now require a bearer token (`Authorization: Bearer <token>`): mcp-victoriametrics via `MCP_AUTH_TOKEN` and mcp-grafana via `MCP_GRAFANA_SERVER_TOKEN`; requests without the token get 401. mcp-victorialogs is configured the same way, but v1.10.0 does not enforce it yet; it will from the first upstream release that supports `MCP_AUTH_TOKEN`
