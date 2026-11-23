@@ -45,7 +45,7 @@ main() {
     # changes pulled above would otherwise wait for the next container restart.
     info "Reloading vmalert rules..."
     sudo docker compose kill -s SIGHUP vmalert
-    # Ingress/egress lockdown (firewalld policies); observation mode unless
+    # Ingress/egress lockdown (nftables tables); observation mode unless
     # MONITORING_FIREWALL_ENFORCE=true in .env. See README.md, "Firewall".
     sudo "${SCRIPT_DIR}/firewall/configure"
     success "Update complete."

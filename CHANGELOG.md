@@ -29,6 +29,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - mcp-grafana rejected every request with "forbidden: host not allowed" because its Host allowlist defaults to loopback on the container port; it now takes the allowed Host values from MCP_GRAFANA_ALLOWED_HOSTS (default localhost:8082,127.0.0.1:8082)
 ### Changed
 - The three MCP servers (mcp-victoriametrics, mcp-victorialogs, mcp-grafana) use `:latest` images, and the stack now runs Watchtower (hourly, `WATCHTOWER_SCHEDULE`, default `0 17 * * * *`) to keep them up to date; pinned images are unaffected
+- The host egress firewall is now one nftables table (`inet mon_egress`) loaded atomically by `firewall/egress`, instead of firewalld policies and ipsets: the 10-minute refresh reloaded firewalld, and a firewalld killed mid-reload (by the OOM killer) left its block-everything table in place and cut the host off. `firewall/configure` removes the old policies and ipsets with one last reload
 ### Deprecated
 ### Removed
 - Unused .NET template scaffolding removed: src/global.json, the src/Credfeto.Template.slnx solution and its .DotSettings file are no longer present, as nothing in the repository needs them

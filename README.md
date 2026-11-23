@@ -108,14 +108,14 @@ The tokens only control who may use the MCP servers. `mcp-victoriametrics` has f
 | Filter                                | Traffic                     | Allowed                                                                                                                                                                                                                                                      |
 |---------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `mon_ingress` (nftables)              | LAN -> published ports      | syslog (514) and the VictoriaLogs ingest (9428) from the internal networks; Grafana (3000), metrics ingest (8428) and the MCP servers (8081-8083) from the reverse proxies only                                                                                 |
-| `mon-egress` (firewalld policy)        | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies (Docker Hub mirror, pacman cache, metrics and log shipping), GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats and the Arch WKD, ICMP                                  |
-| `mon-egress-docker` (firewalld policy) | containers -> outside world | DNS, HTTPS to the proxies, Discord (Alertmanager), grafana.com (Grafana), Docker Hub and ghcr.io (Watchtower)                                                                                                                                                 |
+| `host_out` (nftables `mon_egress`)     | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies (Docker Hub mirror, pacman cache, metrics and log shipping), GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats and the Arch WKD, ICMP                                  |
+| `docker_fwd` (nftables `mon_egress`)   | containers -> outside world | DNS, HTTPS to the proxies, Discord (Alertmanager), grafana.com (Grafana), Docker Hub and ghcr.io (Watchtower)                                                                                                                                                 |
 
 SSH to the host is left to the host's base configuration.
 
-Ingress is an nftables table of its own (`firewall/ingress.nft.template`, loaded by `monitoring-ingress-firewall.service` before Docker starts) rather than a firewalld policy, because Docker translates published ports itself and firewalld accepts all translated traffic before its policies run. The table only looks at new connections to published ports and matches the published port number.
+Ingress is an nftables table of its own (`firewall/ingress.nft.template`, loaded by `monitoring-ingress-firewall.service` before Docker starts) rather than a firewalld policy, because Docker translates published ports itself and firewalld accepts all translated traffic before its policies run. The table only looks at new connections to published ports and matches the published port number. Egress is a table of its own too: the whole table, address sets included, is replaced in a single `nft -f` transaction, so a refresh never makes firewalld reload, and a ruleset that fails to load leaves the previous one in place.
 
-Destinations without a stable address are firewalld ipsets that `monitoring-egress-refresh.timer` refreshes every 10 minutes: names resolved from DNS, plus GitHub's and Cloudflare's published ranges (`firewall/github-egress-ranges` and `firewall/cloudflare-egress-ranges`, regenerated on a workstation with the matching `firewall/update-*-egress-ranges` script). Cloudflare is allowed as a whole range because it fronts Discord and Docker Hub's image CDN and rotates their addresses too fast for resolved addresses to keep up.
+Destinations without a stable address are address sets in the table that `monitoring-egress-refresh.timer` rebuilds 30 seconds after boot and then every 10 minutes, loading the table only when it differs from the loaded one: names resolved from DNS (a name that does not resolve keeps its last good addresses), plus GitHub's and Cloudflare's published ranges (`firewall/github-egress-ranges` and `firewall/cloudflare-egress-ranges`, regenerated on a workstation with the matching `firewall/update-*-egress-ranges` script). Cloudflare is allowed as a whole range because it fronts Discord and Docker Hub's image CDN and rotates their addresses too fast for resolved addresses to keep up.
 
 `MONITORING_FIREWALL_ENFORCE` in `.env` is the only switch. Unset or anything other than `true` is observation mode: every rule is in place, but traffic that matches none of them still flows and is logged with the prefix `mon-ingress-unmatched:`, `mon-egress-unmatched:` or `mon-egress-docker-unmatched:` (rate-limited to 30 a minute). Run in observation mode first and check the journal for anything legitimate that is not covered:
 
@@ -123,9 +123,13 @@ Destinations without a stable address are firewalld ipsets that `monitoring-egre
 sudo journalctl -k --since -1d | grep -E 'mon-[a-z-]+-unmatched'
 ```
 
-then set `MONITORING_FIREWALL_ENFORCE=true` and run `./update` to drop everything else.
+then set `MONITORING_FIREWALL_ENFORCE=true` and run `./update` to drop everything else. To see the live egress rules:
 
-The firewall keeps itself in step with the repo, like the zone sync on the DNS servers: `monitoring-firewall-sync.timer` (every 15 minutes) refreshes the ipsets, pulls the checkout and re-runs `firewall/configure` when anything under `server/victoriaMetrics/firewall/` changed since the commit it last applied. Container and compose changes still wait for `./update`. The `Repo: Update egress ranges` workflow regenerates the GitHub and Cloudflare range files daily and commits any change to main, refusing a list that has shrunk by more than a fifth, so new ranges reach the host within a day without anyone running anything.
+```sh
+sudo nft list table inet mon_egress
+```
+
+The firewall keeps itself in step with the repo, like the zone sync on the DNS servers: `monitoring-firewall-sync.timer` (every 15 minutes) refreshes the egress table, pulls the checkout and re-runs `firewall/configure` when anything under `server/victoriaMetrics/firewall/` changed since the commit it last applied. Container and compose changes still wait for `./update`. The `Repo: Update egress ranges` workflow regenerates the GitHub and Cloudflare range files daily and commits any change to main, refusing a list that has shrunk by more than a fifth, so new ranges reach the host within a day without anyone running anything.
 
 ### Client: Telegraf
 
