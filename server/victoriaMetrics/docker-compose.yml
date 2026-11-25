@@ -30,7 +30,7 @@ services:
     command:
       - --storageDataPath=/storage
       - --retentionPeriod=12
-    restart: unless-stopped
+    restart: always
 
   victorialogs:
     image: victoriametrics/victoria-logs:v1.54.0
@@ -51,7 +51,7 @@ services:
       - --syslog.useRemoteIP.tcp=true
       - --syslog.useRemoteIP.udp=true
     <<: *hardened
-    restart: unless-stopped
+    restart: always
 
   grafana:
     image: grafana/grafana:13.1.3
@@ -67,7 +67,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    restart: unless-stopped
+    restart: always
 
   vmalert:
     image: victoriametrics/vmalert:v1.111.0
@@ -86,7 +86,7 @@ services:
       - --notifier.url=http://alertmanager:9093
       - --rule=/etc/vmalert/rules/*.yml
     <<: *hardened
-    restart: unless-stopped
+    restart: always
 
   alertmanager:
     image: prom/alertmanager:v0.34.0
@@ -101,7 +101,7 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
     <<: *hardened
-    restart: unless-stopped
+    restart: always
 
   mcp-victoriametrics:
     image: ghcr.io/victoriametrics/mcp-victoriametrics:latest
@@ -118,7 +118,7 @@ services:
       # Callers must send "Authorization: Bearer <token>" (401 otherwise).
       MCP_AUTH_TOKEN: ${MCP_VICTORIAMETRICS_AUTH_TOKEN:?set MCP_VICTORIAMETRICS_AUTH_TOKEN in .env}
     <<: *hardened
-    restart: unless-stopped
+    restart: always
 
   mcp-victorialogs:
     image: ghcr.io/victoriametrics/mcp-victorialogs:latest
@@ -136,7 +136,7 @@ services:
       # it is enforced from the first release that includes it.
       MCP_AUTH_TOKEN: ${MCP_VICTORIALOGS_AUTH_TOKEN:?set MCP_VICTORIALOGS_AUTH_TOKEN in .env}
     <<: *hardened
-    restart: unless-stopped
+    restart: always
 
   mcp-grafana:
     image: grafana/mcp-grafana:latest
@@ -158,7 +158,7 @@ services:
       - --allowed-hosts=${MCP_GRAFANA_ALLOWED_HOSTS:-localhost:8082,127.0.0.1:8082}
       - --disable-write
     <<: *hardened
-    restart: unless-stopped
+    restart: always
 
 volumes:
   victoria-metrics-data:
