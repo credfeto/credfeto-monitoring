@@ -31,6 +31,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Egress script takes a lock and uses a unique temp cache file, so concurrent runs no longer fail
 - `firewall/configure` takes a lock, so the sync timer and `./update` cannot run it concurrently
 - `DiskWillFillWithin24Hours` no longer fires after reboots: ignores `mode`, needs 6h of data
+- `DiskWillFillWithin24Hours` only fires above 50% used and waits 1h before alerting
 - `./update` now reloads vmalert (SIGHUP) so changed alert rules take effect straight away
 - `./update` re-runs itself after `git pull`, so script changes apply on the same run
 - `./update` recreates alertmanager so changes to its bind-mounted `alertmanager.yml` apply
@@ -48,7 +49,6 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 ### Removed
 - Removed unused .NET scaffolding: `src/global.json`, `Credfeto.Template.slnx`, `.DotSettings`
 ### Deployment Changes
-- Firewall starts observe-only; check `journalctl -k`, then enable `MONITORING_FIREWALL_ENFORCE`
 - After a day, check `journalctl -k | grep -E 'mon-[a-z-]+-unmatched'` for uncovered traffic
 - Then set `MONITORING_FIREWALL_ENFORCE=true` in `.env` and run `./update`
 - Add `MCP_VICTORIAMETRICS_AUTH_TOKEN` and `MCP_VICTORIALOGS_AUTH_TOKEN` to `.env` first
