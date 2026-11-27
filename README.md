@@ -49,6 +49,8 @@ The starting rule set covers:
 - low available memory
 - a Docker container that is restart-looping
 - the metrics ingestion pipeline stalling entirely
+- a disk whose SMART health check fails (`SmartDeviceUnhealthy`)
+- an SSD or NVMe drive nearing the end of its rated wear (`SmartDeviceWearHigh`)
 
 Firing alerts do not yet surface inside Grafana; that is tracked separately in [#20][alerting-in-grafana].
 
@@ -148,13 +150,15 @@ The firewall keeps itself in step with the repo, like the zone sync on the DNS s
 
 ```sh
 cd client/Telegraf
-./install.sh    # installs the Telegraf package (Ubuntu/Debian or Arch)
+./install.sh    # installs Telegraf, smartmontools and nvme-cli (Ubuntu/Debian or Arch)
 ./configure.sh  # validates and deploys telegraf.conf, then (re)starts the service
 ```
 
 `configure.sh` checks `telegraf.conf` against the installed Telegraf (`telegraf config check`, available from Telegraf 1.32) before deploying it, and stops without touching `/etc/telegraf` or the service if Telegraf rejects the configuration. Pull requests that change `client/Telegraf/` run the same check against the latest Telegraf release.
 
 When the installed Telegraf systemd unit reads `/etc/default/telegraf` (as the InfluxData package unit does), `configure.sh` creates that file with `TELEGRAF_OPTS=""` if it is missing, or appends `TELEGRAF_OPTS=""` if the file does not define the variable, so systemd stops warning about an unset variable on every start. An existing `TELEGRAF_OPTS` definition is never changed, and the service is restarted only when the file was created or updated.
+
+`install.sh` also installs `/etc/sudoers.d/telegraf-smart` (validated with `visudo`), which lets the `telegraf` user run only `smartctl` and `nvme` through `sudo`. The SMART input needs this to read disk health and wear, which it polls every 5 minutes rather than at the agent's normal interval.
 
 The Docker input keeps only the `com.docker.compose.project` and `com.docker.compose.service` container labels as tags; all other labels are dropped to avoid a new series every time a container is recreated.
 
