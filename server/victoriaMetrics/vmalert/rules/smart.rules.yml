@@ -10,8 +10,11 @@ groups:
       # while the disk sleeps; a newer health_ok=1 sample resolves it as soon
       # as the disk recovers, and a removed disk is left to
       # SmartDeviceNotReporting. Telegraf's power tag (ACTIVE/IDLE/STANDBY)
-      # changes between polls, so min by the stable tags keeps one alert per
-      # disk and stops a power change from restarting for:.
+      # changes between polls, so telegraf.conf drops it at source (tagexclude)
+      # and each disk keeps one stable series; min by the stable tags still
+      # collapses any other tag change into one alert per disk and stops it
+      # restarting for:. A replaced disk's old serial_no series can still
+      # hold its last value for up to 24h; that is accepted.
       - alert: SmartDeviceUnhealthy
         expr: |
           min by (host, device, model, serial_no) (
@@ -35,11 +38,12 @@ groups:
       # spun-down disk.
       # (SmartDeviceUnhealthy holds the last health_ok while a disk sleeps,
       # which cannot raise a false alert.) Standby points also lack the model and
-      # serial_no tags, because smartctl exits before printing identity, and
-      # carry a power tag that flips with the disk's state, so both sides
-      # aggregate to (host, device) only. The window is a device seen in the
-      # last 24h (the lookback host.rules.yml uses) with no sample in the last
-      # 15m (three polls); it resolves 24h after the last sample. The host
+      # serial_no tags, because smartctl exits before printing identity (the
+      # power tag that flips with the disk's state is dropped at source in
+      # telegraf.conf), so both sides aggregate to (host, device) only. The
+      # window is a device seen in the last 24h (the lookback host.rules.yml
+      # uses) with no sample in the last 15m (three polls); it resolves 24h
+      # after the last sample. The host
       # freshness guard leaves a whole-host outage to HostNotReporting, and
       # for: 10m covers the wait for Telegraf's first 5m SMART poll after a
       # host or agent restart. Warning, not critical: a removed disk looks the
@@ -71,8 +75,11 @@ groups:
       # keeps the last reading so for: 1h does not restart while it sleeps.
       # Any smart_attribute tag beyond the disk's identity that changes
       # between polls starts a new series, and the old one lingers in the 24h
-      # lookback, so max by the stable tags keeps one alert per disk from its
-      # worst reading and stops a tag change restarting for: or duplicating it.
+      # lookback; telegraf.conf drops the flipping power tag at source, and
+      # max by the stable tags still keeps one alert per disk from its worst
+      # reading if any other tag changes, so for: is not restarted or
+      # duplicated. A replaced disk's old serial_no can still hold its last
+      # reading for up to 24h; that is accepted.
       - alert: SmartDeviceWearHigh
         expr: |
           max by (host, device, model, serial_no) (
