@@ -96,6 +96,7 @@ services:
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - ./alertmanager/webhook_url:/etc/alertmanager/secrets/webhook_url:ro
+      - ./alertmanager/familiar_webhook_url:/etc/alertmanager/secrets/familiar_webhook_url:ro
       - alertmanager-data:/alertmanager
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml

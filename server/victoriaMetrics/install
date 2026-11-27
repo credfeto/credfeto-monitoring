@@ -71,6 +71,14 @@ check_webhook_secret() {
     require_file "${SCRIPT_DIR}/alertmanager/webhook_url" "Missing ${SCRIPT_DIR}/alertmanager/webhook_url - create it manually with the Slack/Discord chat webhook URL as its only content before running install. It is gitignored and must never be committed."
 }
 
+ensure_familiar_webhook_file() {
+    # Optional second alert receiver (the Familiar agent's webhook): an empty
+    # file disables it. It must exist, or the bind mount creates a directory.
+    if [ ! -f "${SCRIPT_DIR}/alertmanager/familiar_webhook_url" ]; then
+        sudo install -m 640 /dev/null "${SCRIPT_DIR}/alertmanager/familiar_webhook_url"
+    fi
+}
+
 fix_alertmanager_config_permissions() {
     info "Granting alertmanager (uid/gid 65534) read access to its config directory..."
     sudo chgrp -R 65534 "${SCRIPT_DIR}/alertmanager"
@@ -93,6 +101,7 @@ main() {
     cd "${SCRIPT_DIR}"
     check_env_file
     check_webhook_secret
+    ensure_familiar_webhook_file
     create_data_dirs_and_volumes
     fix_alertmanager_config_permissions
     start_services

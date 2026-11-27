@@ -10,38 +10,39 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 
 ## [Unreleased]
 ### Security
-- Firewall: the reverse proxies' Servers VLAN addresses (`192.168.150.250`, `192.168.150.251`, `2a02:8010:61d5:150::250`, `2a02:8010:61d5:150::251`) are no longer allowed; proxy-01/proxy-02 are only reached on their DMZ VLAN addresses
-- Firewall: the reverse proxies' DMZ VLAN addresses (`192.168.140.250`, `192.168.140.251`, `2a02:8010:61d5:140::250`, `2a02:8010:61d5:140::251`) are allowed alongside their Servers VLAN addresses, so proxy-01/proxy-02 can move to the DMZ one at a time without losing access
-- Host firewall lockdown for ingress and egress (`firewall/configure`, run by `./update` and `./install`): an nftables table limits who may reach the published container ports (syslog and log ingest from the LAN; Grafana, metrics ingest and the MCP servers from the reverse proxies only), and firewalld policies limit what the host and the containers may connect to, with CDN-fronted destinations kept in ipsets refreshed every 10 minutes. Observation mode (log unmatched traffic, drop nothing) until `MONITORING_FIREWALL_ENFORCE=true`
-- The MCP servers now require a bearer token (`Authorization: Bearer <token>`): mcp-victoriametrics via `MCP_AUTH_TOKEN` and mcp-grafana via `MCP_GRAFANA_SERVER_TOKEN`; requests without the token get 401. mcp-victorialogs is configured the same way, but v1.10.0 does not enforce it yet; it will from the first upstream release that supports `MCP_AUTH_TOKEN`
+- Firewall: the reverse proxies' Servers VLAN addresses are no longer allowed; only their DMZ ones are
+- Firewall: the reverse proxies' DMZ VLAN addresses are allowed too, so each can move to the DMZ
+- Host ingress and egress firewall (`firewall/configure`), in observation mode until enforce is set
+- MCP servers need a bearer token (401 without it); mcp-victorialogs v1.10.0 does not enforce it yet
 ### Added
-- Firewall auto-sync on the monitoring host (`monitoring-firewall-sync.timer`, every 15 minutes: refresh the egress ipsets, pull, re-run `firewall/configure` when the firewall config changed) and a daily `Repo: Update egress ranges` workflow that regenerates the GitHub and Cloudflare egress range files and commits them to main
-- VictoriaLogs records the sender address of every syslog message as `remote_ip` (`-syslog.useRemoteIP.tcp/udp`), so senders that share a syslog hostname (all Technitium nodes report "dns-server") can be told apart
-- mcp-victorialogs (v1.10.0) MCP server in the VictoriaMetrics stack, backed by VictoriaLogs and exposed on the LAN at port 8083 (`/mcp`, streamable HTTP), so AI assistants can search and summarise the central logs
-- VictoriaLogs (v1.54.0) in the VictoriaMetrics stack as the central log store: syslog (RFC 3164/5424) on port 514 TCP/UDP and the HTTP API on 9428, data in a new `victoria-logs-data` volume (`/data/victoria-logs`), retention via `VICTORIALOGS_RETENTION` (default 30d), plus a provisioned Grafana `VictoriaLogs` datasource (victoriametrics-logs-datasource 0.34.0). Receiving side for centralised syslog (credfeto/credfeto-setup-arch-vm#234)
-- Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
+- Alertmanager also sends every alert to a second receiver, the Familiar agent webhook
+- Firewall auto-sync timer on the monitoring host, and a daily workflow refreshing egress range files
+- VictoriaLogs records each syslog sender's address as `remote_ip`, to tell same-named senders apart
+- mcp-victorialogs (v1.10.0) MCP server on LAN port 8083, so AI assistants can search the central logs
+- VictoriaLogs (v1.54.0) as the central log store: syslog on 514, HTTP API on 9428, Grafana datasource
+- mcp-victoriametrics and mcp-grafana MCP servers on LAN ports 8081 and 8082 for AI assistants (#45)
 - Restricted Funfair MCP server `mcp-victoriametrics-funfair` (port 8084, proxies only) via vmauth
 ### Fixed
-- The egress script takes a lock and writes its resolved-address cache to a unique temp file, so the refresh timer and the firewall sync starting together no longer fail with FileNotFoundError over the shared .tmp file
-- `firewall/configure` takes a lock, so the firewall sync timer and `./update` can no longer configure the firewall at the same time
-- DiskWillFillWithin24Hours fired on hosts only 33-40% full after a reboot: a reboot can flip telegraf's `mode` label and start a new series, and predict_linear over minutes of post-boot data extrapolated past 100%; the rule now ignores `mode`, needs 6h of history, only fires above 50% used, and waits 1h
-- `./update` now reloads vmalert (SIGHUP) after updating, so changed alert rules take effect straight away instead of at the next container restart
-- `./update` re-runs itself after `git pull`, so changes to the update script take effect on the same run instead of the next one
-- `./update` now recreates alertmanager, because its single-file config bind mount kept the old alertmanager.yml after `git pull` (a reload did not pick up changes)
-- Alertmanager never delivered a notification: the receiver used slack_configs against a Discord webhook, which Discord rejected with 400 {"attachments": ["0"]} on every send; it now uses the native discord_configs (webhook_url_file unchanged) with a firing/resolved title and per-alert summary and description
-- HostNotReporting could never fire: host:metrics_stale_seconds used timestamp(last_over_time(...)), which VictoriaMetrics evaluates to the query time, so staleness was always about 0; it now uses tlast_over_time, the timestamp of the last raw sample
-- mcp-grafana rejected every request with "forbidden: host not allowed" because its Host allowlist defaults to loopback on the container port; it now takes the allowed Host values from MCP_GRAFANA_ALLOWED_HOSTS (default localhost:8082,127.0.0.1:8082)
+- The egress script takes a lock and uses a unique temp file, so concurrent runs no longer fail
+- `firewall/configure` takes a lock, so the sync timer and `./update` cannot run it at the same time
+- DiskWillFillWithin24Hours misfired after reboots; it now ignores `mode` and needs 6h of history
+- `./update` reloads vmalert (SIGHUP) after updating, so changed alert rules take effect straight away
+- `./update` re-runs itself after `git pull`, so changes to the update script apply on the same run
+- `./update` recreates alertmanager, as its single-file bind mount kept the old config after a pull
+- Alertmanager never delivered a notification: it now uses discord_configs instead of slack_configs
+- HostNotReporting could never fire: host:metrics_stale_seconds now uses tlast_over_time
+- mcp-grafana rejected every request (host not allowed); it now reads MCP_GRAFANA_ALLOWED_HOSTS
 - Funfair MCP host filter matched nothing: vmauth decoded the + in its regex as a space
 ### Changed
-- All containers use `restart: always` instead of `unless-stopped`, so a container stopped during a reboot or daemon restart is always brought back (an unless-stopped container was left down after a clean reboot)
-- The three MCP servers (mcp-victoriametrics, mcp-victorialogs, mcp-grafana) use `:latest` images, and the stack now runs Watchtower (hourly, `WATCHTOWER_SCHEDULE`, default `0 17 * * * *`) to keep them up to date; pinned images are unaffected
-- The host egress firewall is now one nftables table (`inet mon_egress`) loaded atomically by `firewall/egress`, instead of firewalld policies and ipsets: the 10-minute refresh reloaded firewalld, and a firewalld killed mid-reload (by the OOM killer) left its block-everything table in place and cut the host off. `firewall/configure` removes the old policies and ipsets with one last reload
+- All containers use `restart: always` instead of `unless-stopped`, so they come back after a reboot
+- The MCP servers use `:latest` images, and Watchtower (`WATCHTOWER_SCHEDULE`) keeps them up to date
+- The host egress firewall is one nftables table (`inet mon_egress`) instead of firewalld policies
 ### Deprecated
 ### Removed
-- Unused .NET template scaffolding removed: src/global.json, the src/Credfeto.Template.slnx solution and its .DotSettings file are no longer present, as nothing in the repository needs them
+- Unused .NET template scaffolding removed: src/global.json and the Credfeto.Template solution files
 ### Deployment Changes
-- The firewall starts in observation mode. After a day, check `journalctl -k | grep -E 'mon-[a-z-]+-unmatched'` for legitimate traffic that is not covered, then set `MONITORING_FIREWALL_ENFORCE=true` in `.env` and run `./update`
-- Before updating, add `MCP_VICTORIAMETRICS_AUTH_TOKEN`, `MCP_VICTORIALOGS_AUTH_TOKEN` and `MCP_GRAFANA_SERVER_TOKEN` to `.env` (`openssl rand -hex 32` each); `docker compose` refuses to start the stack without them. Then add the matching `Authorization: Bearer <token>` header to every MCP client
+- The firewall starts in observation mode: check the unmatched logs, then enable enforcing in `.env`
+- Before updating, add the three MCP auth tokens to `.env`, then the Bearer header to every MCP client
 
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
@@ -57,39 +58,39 @@ Releases that have at least been deployed to staging, BUT NOT necessarily releas
 
 ## [0.0.5] - 2026-10-15
 ### Added
-- configure.sh validates telegraf.conf with telegraf config check before deploying it, and a CI workflow runs the same check against the latest Telegraf release on pull requests, so removed options are caught before they break a host
+- configure.sh and a CI workflow check telegraf.conf with telegraf config check before deploying it
 ### Fixed
-- Telegraf failed to start on hosts running Telegraf 1.38 or later because telegraf.conf used the container_names, perdevice and total options removed from inputs.docker; now uses perdevice_include and total_include
-- Fixed vmalert failing to start due to an invalid --remoteWrite.tmpDataPath flag (not supported by vmalert).
-- systemd warned about an unset TELEGRAF_OPTS on every Telegraf start; configure.sh now creates /etc/default/telegraf, or appends TELEGRAF_OPTS="" when the file exists but does not define it, leaving any existing definition unchanged
-- configure.sh reported success and restarted Telegraf even when reading or writing the config or defaults file failed; it now stops with an error
-- Fixed alertmanager crash-looping due to permission-denied reading its config; install/update scripts now grant its runtime uid/gid read access.
+- Telegraf 1.38+ failed to start: inputs.docker now uses perdevice_include and total_include
+- Fixed vmalert failing to start due to an invalid --remoteWrite.tmpDataPath flag
+- systemd warned about an unset TELEGRAF_OPTS; configure.sh now defines it in /etc/default/telegraf
+- configure.sh now stops with an error when reading or writing the config or defaults file fails
+- Fixed alertmanager crash-looping reading its config; install/update grant its uid/gid read access
 ### Changed
-- The Docker input now tags only the com.docker.compose.project and com.docker.compose.service container labels instead of every label, so labels that change on every recreate (such as the compose config hash) no longer grow series cardinality on each watchtower update
-- skip_processors_after_aggregators is now set explicitly in [agent] to silence Telegraf's default-change warning
-- Telegraf disk input now also ignores nsfs and efivarfs pseudo-filesystems, which have no meaningful disk-usage metrics.
+- The Docker input tags only the compose project and service labels, so recreates no longer add series
+- skip_processors_after_aggregators is set explicitly in [agent] to silence Telegraf's warning
+- Telegraf disk input also ignores the nsfs and efivarfs pseudo-filesystems
 - SDK - Updated DotNet SDK to 10.0.402
 ### Removed
 - Unused src/FunFair.props
 ### Deployment Changes
-- Run client/Telegraf/configure.sh on each monitored host to apply the Telegraf config and defaults-file changes
+- Run client/Telegraf/configure.sh on each host to apply the Telegraf config and defaults-file changes
 
 ## [0.0.4] - 2026-09-17
 ### Fixed
-- Telegraf client config pointed at metrics.markridgwell.com, which has no DNS record, causing metrics pushes to silently fail on every host; now points at monitoring.markridgwell.com
+- Telegraf used metrics.markridgwell.com, which has no DNS record; now monitoring.markridgwell.com
 ### Changed
 - SDK - Updated DotNet SDK to 10.0.401
 
 ## [0.0.3] - 2026-08-20
 ### Added
-- Add Grafana as a sibling service in the VictoriaMetrics compose stack, provisioned from repo-checked-in files (VictoriaMetrics datasource, host overview and Docker containers dashboards) so metrics are visible without manual setup
-- Add vmalert and Alertmanager to the VictoriaMetrics compose stack, alerting on host outages, disk usage/predicted fill, sustained CPU load, low memory, Docker container restart loops and stalled metrics ingestion, notifying via a Slack/Discord-compatible chat webhook
+- Add Grafana to the VictoriaMetrics stack, with a datasource and dashboards provisioned from the repo
+- Add vmalert and Alertmanager to the VictoriaMetrics stack, alerting via a chat webhook
 ### Fixed
 - Fixed README.md formatting to pass the markdownlint pre-commit baseline check.
-- VictoriaMetrics was bound to 127.0.0.1 only, making it unreachable from any other host on the network; changed to publish the port on all interfaces so Telegraf agents and the reverse proxy can actually reach it.
-- Telegraf install on Ubuntu/Debian failed because the InfluxData signing key it fetched had expired and no longer covered the repository's active signing subkey; now fetches the current key, verifies its fingerprint before trusting it, and self-repairs hosts left with the stale keyring.
+- VictoriaMetrics was bound to 127.0.0.1 only; it now publishes its port on all interfaces
+- Telegraf install on Ubuntu/Debian failed on an expired InfluxData key; it now fetches a verified one
 ### Changed
-- Rewrote README.md to describe the actual repo contents (VictoriaMetrics server and Telegraf client) instead of the leftover cs-template placeholder text.
+- Rewrote README.md to describe the actual repo contents instead of the cs-template placeholder text
 - SDK - Updated DotNet SDK to 10.0.400
 
 ## [0.0.2] - 2026-07-16
@@ -98,7 +99,7 @@ Releases that have at least been deployed to staging, BUT NOT necessarily releas
 
 ## [0.0.1] - 2026-06-11
 ### Fixed
-- on_new_pr.yml: inline composite action logic to fix local action path resolution failure under pull_request_target
+- on_new_pr.yml: inline the composite action logic to fix local action path resolution failure
 ### Changed
 - SDK - Updated DotNet SDK to 10.0.301
 
