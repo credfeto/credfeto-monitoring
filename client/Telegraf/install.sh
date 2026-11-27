@@ -52,7 +52,8 @@ setup_influxdata_apt_repo() {
 
     # Verified directly against https://repos.influxdata.com/influxdata-archive.key
     # with `gpg --show-keys --with-colons`; this is the primary key fingerprint,
-    # which stays constant across InfluxData's subkey rotations (see issue #22).
+    # which stays constant when InfluxData rotates its signing subkeys, so pinning
+    # it does not break the install each time a subkey changes.
     influxdata_key_fingerprint="24C975CBA61A024EE1B631787C3D57159FC2F927"
     keyring_path="/etc/apt/keyrings/influxdata-archive.gpg"
     sources_list="/etc/apt/sources.list.d/influxdata.list"
