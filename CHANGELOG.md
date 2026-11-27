@@ -31,6 +31,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Alertmanager never delivered a notification: the receiver used slack_configs against a Discord webhook, which Discord rejected with 400 {"attachments": ["0"]} on every send; it now uses the native discord_configs (webhook_url_file unchanged) with a firing/resolved title and per-alert summary and description
 - HostNotReporting could never fire: host:metrics_stale_seconds used timestamp(last_over_time(...)), which VictoriaMetrics evaluates to the query time, so staleness was always about 0; it now uses tlast_over_time, the timestamp of the last raw sample
 - mcp-grafana rejected every request with "forbidden: host not allowed" because its Host allowlist defaults to loopback on the container port; it now takes the allowed Host values from MCP_GRAFANA_ALLOWED_HOSTS (default localhost:8082,127.0.0.1:8082)
+- Funfair MCP host filter matched nothing: vmauth decoded the + in its regex as a space
 ### Changed
 - All containers use `restart: always` instead of `unless-stopped`, so a container stopped during a reboot or daemon restart is always brought back (an unless-stopped container was left down after a clean reboot)
 - The three MCP servers (mcp-victoriametrics, mcp-victorialogs, mcp-grafana) use `:latest` images, and the stack now runs Watchtower (hourly, `WATCHTOWER_SCHEDULE`, default `0 17 * * * *`) to keep them up to date; pinned images are unaffected
