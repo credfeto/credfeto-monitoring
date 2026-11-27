@@ -41,6 +41,8 @@ Grafana is available on port `3000` once the stack is running. Its VictoriaMetri
 
 The webhook URL is never committed: create `server/victoriaMetrics/alertmanager/webhook_url` on the host (a plain text file containing only the URL) before running `./install`; that path is gitignored.
 
+Alertmanager also sends every alert (firing and resolved) to a second receiver, `familiar-webhook`: an inbound webhook of the Familiar agent, which investigates each alert and reports the cause. Its URL is a secret too: put it alone in `server/victoriaMetrics/alertmanager/familiar_webhook_url` (gitignored, mode 640). `./install` and `./update` create the file empty if it is missing; while it is empty that receiver just logs failed sends and the chat webhook is unaffected.
+
 The starting rule set covers:
 
 - a host that has stopped reporting metrics

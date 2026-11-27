@@ -18,6 +18,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 fix_alertmanager_config_permissions() {
     info "Granting alertmanager (uid/gid 65534) read access to its config directory..."
+    # The Familiar webhook URL is optional: make sure the file exists, or the
+    # bind mount would create a directory in its place and alertmanager fails.
+    if [ ! -f "${SCRIPT_DIR}/alertmanager/familiar_webhook_url" ]; then
+        sudo install -m 640 /dev/null "${SCRIPT_DIR}/alertmanager/familiar_webhook_url"
+    fi
     sudo chgrp -R 65534 "${SCRIPT_DIR}/alertmanager"
     success "alertmanager config directory permissions set."
 }
