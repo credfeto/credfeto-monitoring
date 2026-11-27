@@ -16,6 +16,41 @@ groups:
           summary: "SMART health check failed for {{ $labels.device }} on {{ $labels.host }}"
           description: "{{ $labels.device }} ({{ $labels.model }} {{ $labels.serial_no }}) on {{ $labels.host }} failed its SMART overall health check."
 
+      # A drive that drops off the bus disappears from smartctl --scan, so
+      # Telegraf stops emitting smart_device for it and SmartDeviceUnhealthy
+      # resolves just when the disk is at its worst. Presence is keyed on
+      # exit_status, not health_ok: Telegraf (smart.go v1.36.4) always adds
+      # exit_status for every scanned device, but a disk asleep under
+      # -n standby makes smartctl exit before the health line, so health_ok
+      # is absent and keying on it would alert on every idle spun-down disk.
+      # (SmartDeviceUnhealthy just has no data while a disk sleeps, which
+      # cannot raise a false alert.) Standby points also lack the model and
+      # serial_no tags, because smartctl exits before printing identity, and
+      # carry a power tag that flips with the disk's state, so both sides
+      # aggregate to (host, device) only. The window is a device seen in the
+      # last 24h (the lookback host.rules.yml uses) with no sample in the last
+      # 15m (three polls); it resolves 24h after the last sample. The host
+      # freshness guard leaves a whole-host outage to HostNotReporting, and
+      # for: 10m covers the wait for Telegraf's first 5m SMART poll after a
+      # host or agent restart. Warning, not critical: a removed disk looks the
+      # same as a dead drive, so this needs a person to check.
+      - alert: SmartDeviceNotReporting
+        expr: |
+          (
+            max by (host, device) (present_over_time(smart_device_exit_status[24h]))
+            unless
+            max by (host, device) (present_over_time(smart_device_exit_status[15m]))
+          )
+          and on (host) (host:metrics_stale_seconds < 300)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SMART data stopped for {{ $labels.device }} on {{ $labels.host }}"
+          description: >-
+            {{ $labels.device }} on {{ $labels.host }} has sent no SMART data for 15 minutes
+            while the host is still reporting; the disk may have failed or been removed.
+
       # Telegraf writes NVMe "Percentage Used" (and the SAS endurance
       # indicator, which it maps to the same name) only to smart_attribute,
       # never to smart_device, so this series exists only while
