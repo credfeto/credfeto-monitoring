@@ -65,9 +65,12 @@ groups:
       # endurance indicator, which it maps to the same name) only to
       # smart_attribute; newer releases may also emit
       # smart_device_percentage_used. This rule reads smart_attribute, so it
-      # needs telegraf.conf to keep attributes = true.
+      # needs telegraf.conf to keep attributes = true. Under -n standby
+      # smartctl exits before the attribute table, so a sleeping disk emits
+      # no smart_attribute; the 24h lookback (as SmartDeviceUnhealthy uses)
+      # keeps the last reading so for: 1h does not restart while it sleeps.
       - alert: SmartDeviceWearHigh
-        expr: last_over_time(smart_attribute_raw_value{name="Percentage_Used"}[15m]) >= 90
+        expr: last_over_time(smart_attribute_raw_value{name="Percentage_Used"}[24h]) >= 90
         for: 1h
         labels:
           severity: warning
@@ -81,11 +84,13 @@ groups:
       # (remaining life), the opposite direction to NVMe Percentage_Used.
       # A drive can report more than one of them; min by device gives one
       # alert per drive from its worst (lowest) reading rather than one per
-      # attribute.
+      # attribute. These fields come from the attribute table, which smartctl
+      # never reaches for a disk asleep under -n standby, so the 24h lookback
+      # keeps the last reading and for: 1h does not restart while it sleeps.
       - alert: SmartDeviceWearHigh
         expr: |
           min by (host, device, model, serial_no) (
-            last_over_time({__name__=~"smart_device_(wear_leveling_count|media_wearout_indicator|percent_lifetime_remain)"}[15m])
+            last_over_time({__name__=~"smart_device_(wear_leveling_count|media_wearout_indicator|percent_lifetime_remain)"}[24h])
           ) <= 10
         for: 1h
         labels:
