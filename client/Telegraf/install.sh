@@ -78,10 +78,7 @@ apt_package_installed() {
     dpkg -l "$1" 2>/dev/null | grep -q '^ii'
 }
 
-# Package lists only need refreshing once per run, and not at all when every
-# requested package is already installed.
-apt_lists_updated=false
-
+# Package lists are refreshed only when a requested package is missing.
 install_apt_packages() {
     for package in "$@"; do
         shift
@@ -93,10 +90,7 @@ install_apt_packages() {
     done
 
     if [ "$#" -gt 0 ]; then
-        if [ "${apt_lists_updated}" = false ]; then
-            sudo apt-get update -qq
-            apt_lists_updated=true
-        fi
+        sudo apt-get update -qq
         sudo apt-get install -y "$@"
     fi
 }
