@@ -64,6 +64,8 @@ groups:
           description: >-
             {{ $labels.device }} on {{ $labels.host }} has sent no SMART data for 15 minutes
             while the host is still reporting; the disk may have failed or been removed.
+            This alert clears by itself 24 hours after the last sample even if the disk is
+            still missing, so a resolved notification does not mean the disk came back.
 
       # If every per-device query is refused (the sudoers rule does not match
       # the argv Telegraf runs, or the installed sudo) or smartctl rejects the
