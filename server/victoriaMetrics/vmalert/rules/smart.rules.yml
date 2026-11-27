@@ -47,7 +47,12 @@ groups:
       # freshness guard leaves a whole-host outage to HostNotReporting, and
       # for: 10m covers the wait for Telegraf's first 5m SMART poll after a
       # host or agent restart. Warning, not critical: a removed disk looks the
-      # same as a dead drive, so this needs a person to check.
+      # same as a dead drive, so this needs a person to check. Keyed on the
+      # device path (standby points carry no serial_no to key on), it also
+      # fires, and clears 24h later, for a harmless loss of a path seen in the
+      # last 24h: a disk newly listed in excludes, /dev/sdX or /dev/nvmeN
+      # names reassigned on reboot or hot-plug, or an unplugged USB disk.
+      # Silence those; they are expected.
       - alert: SmartDeviceNotReporting
         expr: |
           (
@@ -66,6 +71,8 @@ groups:
             while the host is still reporting; the disk may have failed or been removed.
             This alert clears by itself 24 hours after the last sample even if the disk is
             still missing, so a resolved notification does not mean the disk came back.
+            It may also follow excluding, renaming or unplugging a disk; silence it, as it
+            clears after 24 hours.
 
       # If every per-device query is refused (the sudoers rule does not match
       # the argv Telegraf runs, or the installed sudo) or smartctl rejects the
@@ -78,7 +85,8 @@ groups:
       # does not recognise ("Unknown USB bridge ... specify device type with
       # -d"), because Telegraf passes only the scanned path with no -d; such
       # a disk can be skipped with excludes = ["/dev/sdX"] in inputs.smart in
-      # client/Telegraf/telegraf.conf. Every other smartctl outcome is either
+      # client/Telegraf/telegraf.conf, which raises SmartDeviceNotReporting
+      # once for that disk for up to 24h. Every other smartctl outcome is either
       # 0 or sets a higher bit (a disk asleep under -n standby exits 2, a
       # device it cannot query for SMART sets bit 2, a failing disk sets bit
       # 3 or above), so exit_status == 1 means no SMART data could be read,
@@ -109,7 +117,8 @@ groups:
             arguments (check the sudoers rule installed by install.sh and the Telegraf
             version), or smartctl could not open or identify the device, for example a USB
             disk behind an unsupported USB bridge; such a disk can be skipped with excludes
-            in inputs.smart in telegraf.conf.
+            in inputs.smart in telegraf.conf, which raises SmartDeviceNotReporting once for
+            that disk for up to 24 hours.
 
       # Telegraf v1.36.4 writes NVMe "Percentage Used" (and the SAS
       # endurance indicator, which it maps to the same name) only to
