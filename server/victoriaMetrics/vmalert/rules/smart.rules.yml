@@ -3,17 +3,19 @@ groups:
   - name: smart
     interval: 5m
     rules:
-      # Telegraf polls SMART only every 5m, so a plain instant query can miss
-      # the latest sample when a poll lands late or smartctl times out, which
-      # would resolve and re-fire the alert. last_over_time over 15m (three
-      # polls) rides out up to two missed polls without flapping. Telegraf's
-      # power tag (ACTIVE/IDLE/STANDBY) changes between polls, so min by the
-      # stable tags keeps one alert per disk and stops a power change from
-      # restarting for:.
+      # A disk asleep under -n standby emits no health_ok (Telegraf smart.go
+      # v1.36.4), so a short lookback would go empty while a failing disk is
+      # spun down and the alert would resolve and re-fire. last_over_time over
+      # 24h (the lookback host.rules.yml uses) keeps the last known health
+      # while the disk sleeps; a newer health_ok=1 sample resolves it as soon
+      # as the disk recovers, and a removed disk is left to
+      # SmartDeviceNotReporting. Telegraf's power tag (ACTIVE/IDLE/STANDBY)
+      # changes between polls, so min by the stable tags keeps one alert per
+      # disk and stops a power change from restarting for:.
       - alert: SmartDeviceUnhealthy
         expr: |
           min by (host, device, model, serial_no) (
-            last_over_time(smart_device_health_ok[15m])
+            last_over_time(smart_device_health_ok[24h])
           ) == 0
         for: 5m
         labels:
@@ -24,13 +26,15 @@ groups:
 
       # A drive that drops off the bus disappears from smartctl --scan, so
       # Telegraf stops emitting smart_device for it and SmartDeviceUnhealthy
-      # resolves just when the disk is at its worst. Presence is keyed on
-      # exit_status, not health_ok: Telegraf (smart.go v1.36.4) always adds
-      # exit_status for every scanned device, but a disk asleep under
-      # -n standby makes smartctl exit before the health line, so health_ok
-      # is absent and keying on it would alert on every idle spun-down disk.
-      # (SmartDeviceUnhealthy just has no data while a disk sleeps, which
-      # cannot raise a false alert.) Standby points also lack the model and
+      # only holds its last health value for up to 24h, which says nothing
+      # about the disk having stopped reporting; this rule flags that.
+      # Presence is keyed on exit_status, not health_ok: Telegraf (smart.go
+      # v1.36.4) always adds exit_status for every scanned device, but a disk
+      # asleep under -n standby makes smartctl exit before the health line,
+      # so health_ok is absent and keying on it would alert on every idle
+      # spun-down disk.
+      # (SmartDeviceUnhealthy holds the last health_ok while a disk sleeps,
+      # which cannot raise a false alert.) Standby points also lack the model and
       # serial_no tags, because smartctl exits before printing identity, and
       # carry a power tag that flips with the disk's state, so both sides
       # aggregate to (host, device) only. The window is a device seen in the
