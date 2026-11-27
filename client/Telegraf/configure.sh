@@ -41,8 +41,9 @@ is_ai_agent() {
     [ "${CLAUDECODE:-}" = "1" ]
 }
 
-# The telegraf service runs with the systemd default PATH, so the checks run
-# with it too rather than with the invoking user's PATH.
+# The checks run with a fixed system PATH rather than the invoking user's, so
+# a user-writable directory early in that PATH cannot change what is found.
+# install.sh's resolve_system_command uses the same list and must match it.
 run_with_system_path() (
     PATH="${SYSTEM_PATH}"
     "$@"

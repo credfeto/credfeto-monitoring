@@ -183,13 +183,51 @@ require_sudoers_safe_path() {
     esac
 }
 
-# Resolved against the systemd default service PATH rather than the caller's,
-# so the rule names the binary Telegraf's service will actually run, and a
+# Resolved against a fixed system PATH rather than the caller's, so a
 # user-writable directory early in the caller's PATH cannot end up trusted.
+# configure.sh's SYSTEM_PATH is the same list and must be kept matching it.
 resolve_system_command() (
     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     command -v "$1"
 )
+
+# Adds a path to smartctl_paths once, after the sudoers safety check.
+add_smartctl_path() {
+    require_sudoers_safe_path "$1"
+    case " ${smartctl_paths} " in
+        *" $1 "*) ;;
+        *) smartctl_paths="${smartctl_paths:+${smartctl_paths} }$1" ;;
+    esac
+}
+
+# Telegraf runs `sudo -n` with the smartctl its own service PATH finds, which
+# can differ from the one resolved here (on merged-sbin systems such as Arch,
+# /usr/sbin is a symlink to /usr/bin, so either may be found). Classic sudo
+# matches by inode, but sudo-rs or stricter matching may compare the path, so
+# the rule lists every path that reaches the same binary: the resolved one,
+# its canonical target, and /usr/bin and /usr/sbin when they lead to it.
+collect_smartctl_paths() {
+    smartctl_paths=""
+    resolved_path=$(resolve_system_command smartctl) || die "smartctl not found after installing smartmontools."
+    canonical_path=$(readlink -f "${resolved_path}") || die "Cannot resolve the real path of ${resolved_path}."
+    add_smartctl_path "${resolved_path}"
+    add_smartctl_path "${canonical_path}"
+    for alternative_path in /usr/bin/smartctl /usr/sbin/smartctl; do
+        if [ -e "${alternative_path}" ] && [ "$(readlink -f "${alternative_path}")" = "${canonical_path}" ]; then
+            add_smartctl_path "${alternative_path}"
+        fi
+    done
+}
+
+# Prints one Cmnd_Alias entry, preceded by the comma and line continuation
+# that end the previous entry, and counts it.
+append_sudoers_command() {
+    if [ "${command_count}" -gt 0 ]; then
+        printf ', \\\n    '
+    fi
+    printf '%s' "$1"
+    command_count=$((command_count + 1))
+}
 
 # sudo-rs (Ubuntu 26.04's default sudo) prints "sudo-rs <version>" as the first
 # line of --version. Anything else, including no output, is treated as classic
@@ -205,8 +243,7 @@ install_telegraf_smart_sudoers() {
     info "Granting telegraf passwordless sudo for read-only smartctl queries..."
 
     sudoers_path="/etc/sudoers.d/telegraf-smart"
-    smartctl_path=$(resolve_system_command smartctl) || die "smartctl not found after installing smartmontools."
-    require_sudoers_safe_path "${smartctl_path}"
+    collect_smartctl_paths
 
     # Each entry is the exact argv Telegraf's inputs.smart runs (`sudo -n` plus
     # the scans and the per-device query), so telegraf cannot use sudo to run
@@ -224,26 +261,37 @@ install_telegraf_smart_sudoers() {
     #   for every poll, as the inputs.smart README recommends. It is left out
     #   under sudo-rs, which has none of these settings and fails visudo -c on
     #   them; sudo-rs has no equivalent until 0.2.15's !log_allowed.
+    # - sudo-rs refuses a list of more than 127 items, so the entry count is
+    #   checked below: each smartctl path adds 44 (2 scans + 26 sd + 16 nvme),
+    #   and the usual one or two paths stay well under it.
     candidate="${work_dir}/telegraf-smart.sudoers"
-    smartctl_query="${smartctl_path} --info --health --attributes --tolerance\\=verypermissive -n standby --format\\=brief"
+    command_count=0
     {
         printf '%s\n' "# Installed by credfeto-monitoring client/Telegraf/install.sh: read-only"
         printf '%s\n' "# smartctl queries for Telegraf's inputs.smart (use_sudo = true)."
-        printf 'Cmnd_Alias TELEGRAF_SMARTCTL = %s --scan, \\\n' "${smartctl_path}"
-        printf '    %s --scan --device\\=nvme' "${smartctl_path}"
-        for letter in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
-            printf ', \\\n    %s /dev/sd%s' "${smartctl_query}" "${letter}"
-        done
-        nvme_index=0
-        while [ "${nvme_index}" -le 15 ]; do
-            printf ', \\\n    %s /dev/nvme%s' "${smartctl_query}" "${nvme_index}"
-            nvme_index=$((nvme_index + 1))
+        printf '%s' "Cmnd_Alias TELEGRAF_SMARTCTL = "
+        for smartctl_path in ${smartctl_paths}; do
+            smartctl_query="${smartctl_path} --info --health --attributes --tolerance\\=verypermissive -n standby --format\\=brief"
+            append_sudoers_command "${smartctl_path} --scan"
+            append_sudoers_command "${smartctl_path} --scan --device\\=nvme"
+            for letter in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+                append_sudoers_command "${smartctl_query} /dev/sd${letter}"
+            done
+            nvme_index=0
+            while [ "${nvme_index}" -le 15 ]; do
+                append_sudoers_command "${smartctl_query} /dev/nvme${nvme_index}"
+                nvme_index=$((nvme_index + 1))
+            done
         done
         printf '\n%s\n' "telegraf ALL=(root) NOPASSWD: TELEGRAF_SMARTCTL"
         if ! is_sudo_rs; then
             printf '%s\n' "Defaults!TELEGRAF_SMARTCTL !logfile, !syslog, !pam_session"
         fi
     } > "${candidate}"
+
+    if [ "${command_count}" -gt 127 ]; then
+        die "Generated sudoers rule has ${command_count} commands, over sudo-rs's 127-item limit (smartctl paths: ${smartctl_paths})."
+    fi
 
     # The installed file is readable by root only, so the comparison runs as root.
     if sudo cmp -s "${candidate}" "${sudoers_path}"; then
