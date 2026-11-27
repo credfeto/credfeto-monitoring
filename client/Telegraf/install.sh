@@ -166,6 +166,16 @@ resolve_system_command() (
     command -v "$1"
 )
 
+# sudo-rs (Ubuntu 26.04's default sudo) prints "sudo-rs <version>" as the first
+# line of --version. Anything else, including no output, is treated as classic
+# sudo, whose sudoers syntax is the superset.
+is_sudo_rs() {
+    case "$(sudo --version 2>/dev/null | head -n 1)" in
+        sudo-rs*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 install_telegraf_smart_sudoers() {
     info "Granting telegraf passwordless sudo for read-only smartctl queries..."
 
@@ -178,26 +188,37 @@ install_telegraf_smart_sudoers() {
     # smartctl self-tests or --set, or nvme-cli's format/sanitize/write.
     # - nvme is left out: inputs.smart only runs it when enable_extensions is
     #   set, which telegraf.conf does not do.
-    # - Devices are matched with single-character classes, never `*`: sudoers
-    #   wildcards match across spaces, so `/dev/*` would also allow extra
-    #   options appended after the device path.
+    # - Every device is listed by exact path, with no `*`, `?` or bracket
+    #   class: classic sudo wildcards match across spaces (so `/dev/*` would
+    #   also allow extra options after the device path), and sudo-rs compares
+    #   bracket classes literally, so they would never match a real disk.
+    # - Line breaks come only after a comma, because sudo-rs 0.2.13 cannot
+    #   continue a line in the middle of one command's arguments.
     # - `=` must be escaped in sudoers command arguments.
     # - The Defaults! line stops sudo writing a log entry and a PAM session
-    #   for every poll, as the inputs.smart README recommends.
+    #   for every poll, as the inputs.smart README recommends. It is left out
+    #   under sudo-rs, which has none of these settings and fails visudo -c on
+    #   them; sudo-rs has no equivalent until 0.2.15's !log_allowed.
     candidate="${work_dir}/telegraf-smart.sudoers"
     smartctl_query="${smartctl_path} --info --health --attributes --tolerance\\=verypermissive -n standby --format\\=brief"
-    cat > "${candidate}" <<EOF
-# Installed by credfeto-monitoring client/Telegraf/install.sh: read-only
-# smartctl queries for Telegraf's inputs.smart (use_sudo = true).
-Cmnd_Alias TELEGRAF_SMARTCTL = ${smartctl_path} --scan, \\
-    ${smartctl_path} --scan --device\\=nvme, \\
-    ${smartctl_query} /dev/sd[a-z], \\
-    ${smartctl_query} /dev/sd[a-z][a-z], \\
-    ${smartctl_query} /dev/nvme[0-9], \\
-    ${smartctl_query} /dev/nvme[0-9][0-9]
-telegraf ALL=(root) NOPASSWD: TELEGRAF_SMARTCTL
-Defaults!TELEGRAF_SMARTCTL !logfile, !syslog, !pam_session
-EOF
+    {
+        printf '%s\n' "# Installed by credfeto-monitoring client/Telegraf/install.sh: read-only"
+        printf '%s\n' "# smartctl queries for Telegraf's inputs.smart (use_sudo = true)."
+        printf 'Cmnd_Alias TELEGRAF_SMARTCTL = %s --scan, \\\n' "${smartctl_path}"
+        printf '    %s --scan --device\\=nvme' "${smartctl_path}"
+        for letter in a b c d e f g h i j k l m n o p q r s t u v w x y z; do
+            printf ', \\\n    %s /dev/sd%s' "${smartctl_query}" "${letter}"
+        done
+        nvme_index=0
+        while [ "${nvme_index}" -le 15 ]; do
+            printf ', \\\n    %s /dev/nvme%s' "${smartctl_query}" "${nvme_index}"
+            nvme_index=$((nvme_index + 1))
+        done
+        printf '\n%s\n' "telegraf ALL=(root) NOPASSWD: TELEGRAF_SMARTCTL"
+        if ! is_sudo_rs; then
+            printf '%s\n' "Defaults!TELEGRAF_SMARTCTL !logfile, !syslog, !pam_session"
+        fi
+    } > "${candidate}"
 
     # The installed file is readable by root only, so the comparison runs as root.
     if sudo cmp -s "${candidate}" "${sudoers_path}"; then
