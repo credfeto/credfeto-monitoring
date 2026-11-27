@@ -261,9 +261,10 @@ install_telegraf_smart_sudoers() {
     #   for every poll, as the inputs.smart README recommends. It is left out
     #   under sudo-rs, which has none of these settings and fails visudo -c on
     #   them; sudo-rs has no equivalent until 0.2.15's !log_allowed.
-    # - sudo-rs refuses a list of more than 127 items, so the entry count is
-    #   checked below: each smartctl path adds 44 (2 scans + 26 sd + 16 nvme),
-    #   and the usual one or two paths stay well under it.
+    # - sudo-rs refuses a list of more than 127 items, so under sudo-rs the
+    #   entry count is checked below: each smartctl path adds 44 (2 scans +
+    #   26 sd + 16 nvme), and the usual one or two paths stay well under it.
+    #   Classic sudo has no such limit, so the check is skipped there.
     candidate="${work_dir}/telegraf-smart.sudoers"
     command_count=0
     {
@@ -289,7 +290,7 @@ install_telegraf_smart_sudoers() {
         fi
     } > "${candidate}"
 
-    if [ "${command_count}" -gt 127 ]; then
+    if [ "${command_count}" -gt 127 ] && is_sudo_rs; then
         die "Generated sudoers rule has ${command_count} commands, over sudo-rs's 127-item limit (smartctl paths: ${smartctl_paths})."
     fi
 
