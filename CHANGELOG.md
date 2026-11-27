@@ -23,6 +23,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - mcp-victoriametrics and mcp-grafana MCP servers on LAN ports 8081 and 8082 (#45)
 - Restricted Funfair MCP `mcp-victoriametrics-funfair` (port 8084, proxies only) via vmauth
 - vmalert alerts `SmartDeviceUnhealthy` and `SmartDeviceWearHigh` for failing or worn disks
+- vmalert `SmartDeviceNotReporting` warns when a disk stops sending SMART data
 - Telegraf collects SMART disk health and wear data (`inputs.smart`); installs `smartmontools`
 - Telegraf SMART collection runs every 5 minutes; `install.sh` also installs `nvme-cli`
 - Telegraf sudoers rule allows only the read-only `smartctl` queries it runs
