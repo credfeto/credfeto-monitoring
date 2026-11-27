@@ -57,10 +57,11 @@ groups:
             {{ $labels.device }} on {{ $labels.host }} has sent no SMART data for 15 minutes
             while the host is still reporting; the disk may have failed or been removed.
 
-      # Telegraf writes NVMe "Percentage Used" (and the SAS endurance
-      # indicator, which it maps to the same name) only to smart_attribute,
-      # never to smart_device, so this series exists only while
-      # telegraf.conf keeps attributes = true.
+      # Telegraf v1.36.4 writes NVMe "Percentage Used" (and the SAS
+      # endurance indicator, which it maps to the same name) only to
+      # smart_attribute; newer releases may also emit
+      # smart_device_percentage_used. This rule reads smart_attribute, so it
+      # needs telegraf.conf to keep attributes = true.
       - alert: SmartDeviceWearHigh
         expr: last_over_time(smart_attribute_raw_value{name="Percentage_Used"}[15m]) >= 90
         for: 1h
