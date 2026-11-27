@@ -51,7 +51,8 @@ The starting rule set covers:
 - the metrics ingestion pipeline stalling entirely
 - a disk whose SMART health check fails (`SmartDeviceUnhealthy`)
 - a disk that has stopped returning SMART data while its host is still reporting (`SmartDeviceNotReporting`); it also fires, and clears 24 hours later, when a disk is excluded, unplugged or given a different `/dev` name on reboot or hot-plug, so silence it then
-- a disk whose SMART data cannot be read because `sudo` or `smartctl` refuses the query or `smartctl` cannot open or identify the device, for example a USB disk behind an unsupported USB bridge (`SmartDataUnavailable`); such a disk can be skipped with `excludes = ["/dev/sdX"]` in the `[[inputs.smart]]` section of `client/Telegraf/telegraf.conf`, which raises `SmartDeviceNotReporting` once for that disk for up to 24 hours
+- a disk whose SMART data cannot be read because `sudo` or `smartctl` refuses the query or `smartctl` cannot work out the device type, for example a USB disk behind an unsupported USB bridge (`SmartDataUnavailable`); such a disk can be skipped with `excludes = ["/dev/sdX"]` in the `[[inputs.smart]]` section of `client/Telegraf/telegraf.conf`, which raises `SmartDeviceNotReporting` once for that disk for up to 24 hours
+- a disk listed for at least 7 days that has returned no SMART health result in that time, because `smartctl` cannot open it or it has been asleep that long (`SmartHealthStale`); silence it, or skip the disk with `excludes`, if it is expected to sleep for more than 7 days
 - an SSD or NVMe drive nearing the end of its rated wear (`SmartDeviceWearHigh`)
 
 Firing alerts do not yet surface inside Grafana; that is tracked separately in [#20][alerting-in-grafana].

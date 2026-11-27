@@ -14,7 +14,13 @@ groups:
       # and each disk keeps one stable series; min by the stable tags still
       # collapses any other tag change into one alert per disk and stops it
       # restarting for:. A replaced disk's old serial_no series can still
-      # hold its last value for up to 24h; that is accepted.
+      # hold its last value for up to 24h; that is accepted. 24h limit: a
+      # failed health_ok is only held while the disk returns health at least
+      # once a day; a disk asleep for longer, or one that is still listed but
+      # can no longer be opened, drops out of this rule and is left to
+      # SmartHealthStale, which only fires after 7 days without health, so a
+      # failed disk that then stops answering has no alert from 24h until
+      # day 7.
       - alert: SmartDeviceUnhealthy
         expr: |
           min by (host, device, model, serial_no) (
@@ -78,19 +84,25 @@ groups:
       # the argv Telegraf runs, or the installed sudo) or smartctl rejects the
       # argv, only exit_status arrives: SmartDeviceNotReporting stays quiet and
       # the other rules go silent once their 24h lookback runs out. Telegraf
-      # (smart.go v1.36.4) passes the exit code through as-is. sudo -n
-      # refusing a command exits 1, and smartctl's bit 0 (value 1) means its
-      # command line did not parse. smartctl can also return 1 for a device
-      # it cannot open or identify, for example a USB disk behind a bridge it
+      # (smart.go v1.36.4) passes the exit code through unless smartctl
+      # reports the disk awake (see below). sudo -n refusing a command exits
+      # 1, and smartctl's bit 0 (value 1) means its command line did not
+      # parse. smartctl also returns 1 when it cannot
+      # work out the device type, for example a USB disk behind a bridge it
       # does not recognise ("Unknown USB bridge ... specify device type with
       # -d"), because Telegraf passes only the scanned path with no -d; such
       # a disk can be skipped with excludes = ["/dev/sdX"] in inputs.smart in
       # client/Telegraf/telegraf.conf, which raises SmartDeviceNotReporting
       # once for that disk for up to 24h. Every other smartctl outcome is either
-      # 0 or sets a higher bit (a disk asleep under -n standby exits 2, a
-      # device it cannot query for SMART sets bit 2, a failing disk sets bit
-      # 3 or above), so exit_status == 1 means no SMART data could be read,
-      # with no idle-disk false alarms and no time window to tune.
+      # 0 or sets a higher bit, so exit_status == 1 means no SMART data could
+      # be read, with no idle-disk false alarms and no time window to tune.
+      # Bit 1 (value 2) means the device could not be opened or identified,
+      # or is asleep under -n standby; smartctl gives all three the same
+      # value, so this rule does not catch a disk it cannot open, and
+      # SmartHealthStale does. Telegraf resets exit_status to 0 whenever
+      # smartctl reports the disk awake, so higher bits (SMART query or
+      # health failures) rarely reach this metric; health comes from
+      # health_ok instead.
       # last_over_time keeps only the newest poll of each series, and
       # min by (host, device) only combines series of the same disk, so the
       # newest poll decides: the alert is pending from the first poll that
@@ -115,10 +127,57 @@ groups:
             smartctl for {{ $labels.device }} on {{ $labels.host }} exits 1, so no health or
             wear data is collected. Either sudo refused the command or smartctl rejected its
             arguments (check the sudoers rule installed by install.sh and the Telegraf
-            version), or smartctl could not open or identify the device, for example a USB
+            version), or smartctl could not work out the device type, for example a USB
             disk behind an unsupported USB bridge; such a disk can be skipped with excludes
             in inputs.smart in telegraf.conf, which raises SmartDeviceNotReporting once for
-            that disk for up to 24 hours.
+            that disk for up to 24 hours. A device smartctl cannot open exits 2 instead,
+            like a sleeping disk, and is reported by SmartHealthStale.
+
+      # A disk that is still listed by smartctl --scan but can no longer be
+      # opened exits 2, the same value as a disk asleep under -n standby, so
+      # SmartDataUnavailable (== 1) stays quiet, SmartDeviceNotReporting sees
+      # its exit_status and stays quiet, and SmartDeviceUnhealthy's 24h
+      # lookback runs out. A disk asleep for more than 24h likewise loses the
+      # last health SmartDeviceUnhealthy holds. This rule fires for a disk
+      # whose newest poll in the last 15m exited 2 or more (still listed, and
+      # its host reporting) with no health_ok sample for 7d. >= 2 also keeps
+      # an IDENTIFY failure, which sets bit 1 but, under
+      # --tolerance=verypermissive, lets smartctl carry on and add other
+      # bits. It leaves exit 1 to SmartDataUnavailable and skips an awake
+      # SCSI device with no SMART health at all (for example a QEMU virtual
+      # disk), which Telegraf reports as 0 with no health_ok and which would
+      # otherwise warn forever; a device exiting 4 or more with no health
+      # line does warn. The last clause needs the disk
+      # to have been listed 7 to 8 days ago, so a disk that has only just
+      # appeared (including every disk when SMART collection is first rolled
+      # out) is not reported as 7 days without health; the cost is that a
+      # new disk that never answers takes 7 days to warn. Both sides
+      # aggregate to (host, device) because standby points carry no model or
+      # serial_no. 7d is far beyond a normal sleep and well inside the
+      # 12-month retention. A disk that legitimately sleeps for more than 7
+      # days warns too; silence it, or skip it with excludes in inputs.smart
+      # in client/Telegraf/telegraf.conf. for: 1h rides out a disk that wakes
+      # soon after; warning: a person must check the disk.
+      - alert: SmartHealthStale
+        expr: |
+          (
+            max by (host, device) (last_over_time(smart_device_exit_status[15m]) >= 2)
+            unless on (host, device)
+            max by (host, device) (present_over_time(smart_device_health_ok[7d]))
+          )
+          and on (host, device)
+          max by (host, device) (present_over_time(smart_device_exit_status[1d] offset 7d))
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "No SMART health from {{ $labels.device }} on {{ $labels.host }} for 7 days"
+          description: >-
+            {{ $labels.device }} on {{ $labels.host }} is still listed by smartctl but has
+            returned no SMART health result for 7 days, so a failing disk would not be
+            reported. smartctl may be unable to open it, or it has been asleep for over
+            7 days. Check the disk; if it is expected to sleep that long, silence
+            this alert or skip the disk with excludes in inputs.smart in telegraf.conf.
 
       # Telegraf v1.36.4 writes NVMe "Percentage Used" (and the SAS
       # endurance indicator, which it maps to the same name) only to
