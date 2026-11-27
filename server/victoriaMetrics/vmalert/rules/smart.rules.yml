@@ -1,0 +1,45 @@
+---
+groups:
+  - name: smart
+    interval: 5m
+    rules:
+      # Telegraf polls SMART only every 5m, so a plain instant query can miss
+      # the latest sample when a poll lands late or smartctl times out, which
+      # would resolve and re-fire the alert. last_over_time over 15m (three
+      # polls) rides out up to two missed polls without flapping.
+      - alert: SmartDeviceUnhealthy
+        expr: last_over_time(smart_device_health_ok[15m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SMART health check failed for {{ $labels.device }} on {{ $labels.host }}"
+          description: "{{ $labels.device }} ({{ $labels.model }} {{ $labels.serial_no }}) on {{ $labels.host }} failed its SMART overall health check."
+
+      - alert: SmartDeviceWearHigh
+        expr: last_over_time(smart_device_percentage_used[15m]) >= 90
+        for: 1h
+        labels:
+          severity: warning
+          wear_indicator: percentage_used
+        annotations:
+          summary: "NVMe device {{ $labels.device }} on {{ $labels.host }} is at least 90% worn"
+          description: "{{ $labels.device }} ({{ $labels.model }} {{ $labels.serial_no }}) on {{ $labels.host }} has used {{ $value }}% of its endurance."
+
+      # These SATA attributes are normalised values counting down from 100 to
+      # 0 (remaining life), the opposite direction to NVMe percentage_used.
+      # A drive can report more than one of them; min by device gives one
+      # alert per drive from its worst (lowest) reading rather than one per
+      # attribute.
+      - alert: SmartDeviceWearHigh
+        expr: |
+          min by (host, device, model, serial_no) (
+            last_over_time({__name__=~"smart_device_(wear_leveling_count|media_wearout_indicator|percent_lifetime_remain)"}[15m])
+          ) <= 10
+        for: 1h
+        labels:
+          severity: warning
+          wear_indicator: remaining_life
+        annotations:
+          summary: "SSD {{ $labels.device }} on {{ $labels.host }} has 10% or less of its rated life remaining"
+          description: "{{ $labels.device }} ({{ $labels.model }} {{ $labels.serial_no }}) on {{ $labels.host }} has {{ $value }}/100 life remaining."
