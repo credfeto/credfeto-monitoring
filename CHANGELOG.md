@@ -40,7 +40,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - `HostNotReporting` can now fire: `host:metrics_stale_seconds` uses `tlast_over_time`
 - mcp-grafana no longer rejects requests as forbidden: Hosts set by `MCP_GRAFANA_ALLOWED_HOSTS`
 - Funfair MCP host filter matched nothing: vmauth decoded the + in its regex as a space
-- Firewall sync script no longer word-splits changed file paths, so paths with spaces work
+- Firewall sync logs each changed file path on its own line, including paths with spaces
 - Client and server scripts print colour codes only to a terminal, not into piped output
 ### Changed
 - All containers use `restart: always`, not `unless-stopped`, so they return after a reboot
