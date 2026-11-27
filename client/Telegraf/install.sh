@@ -152,7 +152,7 @@ detect_and_install() {
     elif command -v pacman > /dev/null 2>&1; then
         install_arch
     else
-        die "Unsupported package manager — only apt (Ubuntu/Debian) and pacman (Arch) are supported."
+        die "Unsupported package manager: only apt (Ubuntu/Debian) and pacman (Arch) are supported."
     fi
 }
 
@@ -166,7 +166,7 @@ add_telegraf_to_docker_group() {
             info "telegraf already in docker group, skipping."
         fi
     else
-        info "docker group not found — skipping. Docker stats will not be available until Docker is installed and the group exists."
+        info "docker group not found, skipping. Docker stats will not be available until Docker is installed and the group exists."
     fi
 }
 

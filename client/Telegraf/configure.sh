@@ -158,10 +158,10 @@ manage_service() {
     sudo systemctl enable telegraf
 
     if [ "${config_changed}" = "1" ]; then
-        info "Configuration changed — restarting Telegraf..."
+        info "Configuration changed, restarting Telegraf..."
         sudo systemctl restart telegraf
     elif ! sudo systemctl is-active --quiet telegraf; then
-        info "Telegraf not running — starting..."
+        info "Telegraf not running, starting..."
         sudo systemctl start telegraf
     else
         info "Telegraf already running with unchanged config, skipping restart."
