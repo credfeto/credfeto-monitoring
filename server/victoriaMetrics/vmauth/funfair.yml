@@ -12,4 +12,5 @@ unauthorized_user:
         - "/api/v1/series"
         - "/api/v1/labels"
         - "/api/v1/label/[^/]+/values"
-      url_prefix: 'http://victoriametrics:8428/?extra_filters[]={host=~"buildagent-[0-9]+|[0-9]+-clients-funfair-io"}'
+      # No "+" in this regex: vmauth URL-decodes url_prefix, so "+" becomes a space.
+      url_prefix: 'http://victoriametrics:8428/?extra_filters[]={host=~"buildagent-[0-9][0-9]*|[0-9][0-9]*-clients-funfair-io"}'
