@@ -25,6 +25,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - vmalert alerts `SmartDeviceUnhealthy` and `SmartDeviceWearHigh` for failing or worn disks
 - vmalert `SmartDeviceNotReporting` warns when a disk stops sending SMART data
 - vmalert `SmartDataUnavailable` warns when a disk's SMART data cannot be read
+- vmalert `SmartHealthStale` warns when a listed disk returns no SMART health for 7 days
 - Telegraf collects SMART disk health and wear data (`inputs.smart`); installs `smartmontools`
 - Telegraf SMART collection runs every 5 minutes; `install.sh` also installs `nvme-cli`
 - Telegraf sudoers rule allows only the read-only `smartctl` queries it runs
