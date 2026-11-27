@@ -21,6 +21,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - VictoriaLogs (v1.54.0) in the VictoriaMetrics stack as the central log store: syslog (RFC 3164/5424) on port 514 TCP/UDP and the HTTP API on 9428, data in a new `victoria-logs-data` volume (`/data/victoria-logs`), retention via `VICTORIALOGS_RETENTION` (default 30d), plus a provisioned Grafana `VictoriaLogs` datasource (victoriametrics-logs-datasource 0.34.0). Receiving side for centralised syslog (credfeto/credfeto-setup-arch-vm#234)
 - Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
 - Restricted Funfair MCP server `mcp-victoriametrics-funfair` (port 8084, proxies only) via vmauth
+- TBD - to be finalized after review
 ### Fixed
 - The egress script takes a lock and writes its resolved-address cache to a unique temp file, so the refresh timer and the firewall sync starting together no longer fail with FileNotFoundError over the shared .tmp file
 - `firewall/configure` takes a lock, so the firewall sync timer and `./update` can no longer configure the firewall at the same time
