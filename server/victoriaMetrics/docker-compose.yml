@@ -138,6 +138,39 @@ services:
     <<: *hardened
     restart: always
 
+  vmauth-funfair:
+    image: victoriametrics/vmauth:v1.111.0
+    container_name: vmauth-funfair
+    depends_on:
+      - victoriametrics
+    volumes:
+      - ./vmauth/funfair.yml:/etc/vmauth/funfair.yml:ro
+    command:
+      - --auth.config=/etc/vmauth/funfair.yml
+      - --httpListenAddr=:8427
+    <<: *hardened
+    restart: always
+
+  mcp-victoriametrics-funfair:
+    image: ghcr.io/victoriametrics/mcp-victoriametrics:latest
+    container_name: mcp-victoriametrics-funfair
+    depends_on:
+      - vmauth-funfair
+    ports:
+      - "8084:8084"
+    environment:
+      VM_INSTANCE_ENTRYPOINT: http://vmauth-funfair:8427
+      VM_INSTANCE_TYPE: single
+      MCP_SERVER_MODE: http
+      MCP_LISTEN_ADDR: ":8084"
+      # yamllint disable-line rule:line-length
+      MCP_DISABLED_TOOLS: export,flags,metric_relabel_debug,downsampling_filters_debug,retention_filters_debug,test_rules,active_queries,alerts,rules,metric_statistics,metrics_metadata,tsdb_status,top_queries,tenants
+      # Callers send the token in the Authorization header; the reverse
+      # proxies check the same value first.
+      MCP_AUTH_TOKEN: ${MCP_FUNFAIR_AUTH_TOKEN:-}
+    <<: *hardened
+    restart: always
+
   mcp-grafana:
     image: grafana/mcp-grafana:latest
     container_name: mcp-grafana
