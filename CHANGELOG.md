@@ -21,7 +21,8 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - VictoriaLogs (v1.54.0) in the VictoriaMetrics stack as the central log store: syslog (RFC 3164/5424) on port 514 TCP/UDP and the HTTP API on 9428, data in a new `victoria-logs-data` volume (`/data/victoria-logs`), retention via `VICTORIALOGS_RETENTION` (default 30d), plus a provisioned Grafana `VictoriaLogs` datasource (victoriametrics-logs-datasource 0.34.0). Receiving side for centralised syslog (credfeto/credfeto-setup-arch-vm#234)
 - Added mcp-victoriametrics and mcp-grafana MCP servers to the VictoriaMetrics docker compose stack, exposed on the LAN at ports 8081 and 8082 so AI assistants can query metrics and dashboards (#45)
 - Restricted Funfair MCP server `mcp-victoriametrics-funfair` (port 8084, proxies only) via vmauth
-- TBD - to be finalized after review
+- Telegraf collects SMART disk health and wear data (`inputs.smart`, every 5 minutes); `client/Telegraf/install.sh` installs `smartmontools` and `nvme-cli` and a sudoers rule limited to `smartctl` and `nvme`
+- vmalert alerts `SmartDeviceUnhealthy` and `SmartDeviceWearHigh` for failing or heavily worn disks
 ### Fixed
 - The egress script takes a lock and writes its resolved-address cache to a unique temp file, so the refresh timer and the firewall sync starting together no longer fail with FileNotFoundError over the shared .tmp file
 - `firewall/configure` takes a lock, so the firewall sync timer and `./update` can no longer configure the firewall at the same time
@@ -33,6 +34,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - HostNotReporting could never fire: host:metrics_stale_seconds used timestamp(last_over_time(...)), which VictoriaMetrics evaluates to the query time, so staleness was always about 0; it now uses tlast_over_time, the timestamp of the last raw sample
 - mcp-grafana rejected every request with "forbidden: host not allowed" because its Host allowlist defaults to loopback on the container port; it now takes the allowed Host values from MCP_GRAFANA_ALLOWED_HOSTS (default localhost:8082,127.0.0.1:8082)
 - Funfair MCP host filter matched nothing: vmauth decoded the + in its regex as a space
+- The firewall sync script no longer word-splits changed file paths, so paths containing spaces are handled correctly
 ### Changed
 - All containers use `restart: always` instead of `unless-stopped`, so a container stopped during a reboot or daemon restart is always brought back (an unless-stopped container was left down after a clean reboot)
 - The three MCP servers (mcp-victoriametrics, mcp-victorialogs, mcp-grafana) use `:latest` images, and the stack now runs Watchtower (hourly, `WATCHTOWER_SCHEDULE`, default `0 17 * * * *`) to keep them up to date; pinned images are unaffected
