@@ -55,6 +55,8 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - Add `MCP_GRAFANA_SERVER_TOKEN` to `.env` too; generate each token with `openssl rand -hex 32`
 - `docker compose` refuses to start the stack without the three MCP token variables
 - Add `Authorization: Bearer` with the token to every MCP client
+- On each monitored host re-run `client/Telegraf/install.sh` before `configure.sh`
+- Re-run `install.sh` after a host switches to sudo-rs (e.g. Ubuntu 26.04)
 
 <!--
 Releases that have at least been deployed to staging, BUT NOT necessarily released to live.  Changes should be moved from [Unreleased] into here as they are merged into the appropriate release branch
