@@ -69,8 +69,15 @@ groups:
       # smartctl exits before the attribute table, so a sleeping disk emits
       # no smart_attribute; the 24h lookback (as SmartDeviceUnhealthy uses)
       # keeps the last reading so for: 1h does not restart while it sleeps.
+      # Any smart_attribute tag beyond the disk's identity that changes
+      # between polls starts a new series, and the old one lingers in the 24h
+      # lookback, so max by the stable tags keeps one alert per disk from its
+      # worst reading and stops a tag change restarting for: or duplicating it.
       - alert: SmartDeviceWearHigh
-        expr: last_over_time(smart_attribute_raw_value{name="Percentage_Used"}[24h]) >= 90
+        expr: |
+          max by (host, device, model, serial_no) (
+            last_over_time(smart_attribute_raw_value{name="Percentage_Used"}[24h])
+          ) >= 90
         for: 1h
         labels:
           severity: warning
