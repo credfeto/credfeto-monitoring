@@ -6,9 +6,15 @@ groups:
       # Telegraf polls SMART only every 5m, so a plain instant query can miss
       # the latest sample when a poll lands late or smartctl times out, which
       # would resolve and re-fire the alert. last_over_time over 15m (three
-      # polls) rides out up to two missed polls without flapping.
+      # polls) rides out up to two missed polls without flapping. Telegraf's
+      # power tag (ACTIVE/IDLE/STANDBY) changes between polls, so min by the
+      # stable tags keeps one alert per disk and stops a power change from
+      # restarting for:.
       - alert: SmartDeviceUnhealthy
-        expr: last_over_time(smart_device_health_ok[15m]) == 0
+        expr: |
+          min by (host, device, model, serial_no) (
+            last_over_time(smart_device_health_ok[15m])
+          ) == 0
         for: 5m
         labels:
           severity: critical
