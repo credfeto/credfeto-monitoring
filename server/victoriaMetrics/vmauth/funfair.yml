@@ -1,0 +1,15 @@
+---
+# vmauth config for the restricted (Funfair) MCP server.
+# Every request is forced through extra_filters[], so VictoriaMetrics only
+# returns series from these hosts. vmauth does not forward a client query arg
+# that clashes with one in url_prefix, so callers cannot widen the filter.
+# Only the read APIs the MCP query tools need are routed.
+unauthorized_user:
+  url_map:
+    - src_paths:
+        - "/api/v1/query"
+        - "/api/v1/query_range"
+        - "/api/v1/series"
+        - "/api/v1/labels"
+        - "/api/v1/label/[^/]+/values"
+      url_prefix: 'http://victoriametrics:8428/?extra_filters[]={host=~"buildagent-[0-9]+|[0-9]+-clients-funfair-io"}'

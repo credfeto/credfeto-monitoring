@@ -54,13 +54,14 @@ Firing alerts do not yet surface inside Grafana; that is tracked separately in [
 
 ### MCP servers
 
-The stack runs three [Model Context Protocol][mcp] servers so an AI client can query the monitoring data directly. All use the streamable HTTP transport:
+The stack runs four [Model Context Protocol][mcp] servers so an AI client can query the monitoring data directly. All use the streamable HTTP transport:
 
-| Service               | Host port | Endpoint                   | Backed by                                 |
-|-----------------------|-----------|----------------------------|-------------------------------------------|
-| `mcp-victoriametrics` | `8081`    | `http://<host>:8081/mcp`   | VictoriaMetrics (queries, series, labels) |
-| `mcp-grafana`         | `8082`    | `http://<host>:8082/mcp`   | Grafana (dashboards, datasources, alerts) |
-| `mcp-victorialogs`    | `8083`    | `http://<host>:8083/mcp`   | VictoriaLogs (log search, stats, streams) |
+| Service                       | Host port | Endpoint                 | Backed by                                       |
+|-------------------------------|-----------|--------------------------|-------------------------------------------------|
+| `mcp-victoriametrics`         | `8081`    | `http://<host>:8081/mcp` | VictoriaMetrics (queries, series, labels)       |
+| `mcp-grafana`                 | `8082`    | `http://<host>:8082/mcp` | Grafana (dashboards, datasources, alerts)       |
+| `mcp-victorialogs`            | `8083`    | `http://<host>:8083/mcp` | VictoriaLogs (log search, stats, streams)       |
+| `mcp-victoriametrics-funfair` | `8084`    | `http://<host>:8084/mcp` | VictoriaMetrics, Funfair hosts only (see below) |
 
 To connect a client, add each endpoint as a streamable HTTP MCP server. For example, in a client that reads an `mcpServers` JSON configuration:
 
@@ -90,7 +91,7 @@ Each endpoint requires a bearer token: clients must send `Authorization: Bearer 
 
 `mcp-victorialogs` v1.10.0 does not support `MCP_AUTH_TOKEN` yet (it is on upstream `main`), so port 8083 stays open to anyone who can reach it until a release that includes it is out. No configuration change is needed then: the MCP servers use `:latest` images and Watchtower picks up the new release.
 
-The stack runs Watchtower to keep the `:latest` images (the three MCP servers) up to date. It checks hourly (default `0 17 * * * *`, override with `WATCHTOWER_SCHEDULE` in `.env`, a 6-field cron with seconds first). Images pinned to a version are left alone, because Watchtower only pulls a newer image for the same tag.
+The stack runs Watchtower to keep the `:latest` images (the four MCP servers) up to date. It checks hourly (default `0 17 * * * *`, override with `WATCHTOWER_SCHEDULE` in `.env`, a 6-field cron with seconds first). Images pinned to a version are left alone, because Watchtower only pulls a newer image for the same tag.
 
 The tokens only control who may use the MCP servers. `mcp-victoriametrics` has full query access to every metric and `mcp-victorialogs` to every log line (VictoriaMetrics and VictoriaLogs themselves have no authentication), and `mcp-grafana` has whatever the Grafana service account below allows. `mcp-grafana` also runs with `--disable-write`, so it offers no tools that create or change anything in Grafana. The traffic is plain HTTP, so keep the ports on the LAN only and put TLS in front (a reverse proxy) for anything that crosses an untrusted network.
 
@@ -101,15 +102,25 @@ The tokens only control who may use the MCP servers. `mcp-victoriametrics` has f
 3. On the new service account, select **Add service account token**, generate a token and copy it (it is shown only once).
 4. Set `GRAFANA_SERVICE_ACCOUNT_TOKEN` in `.env` to the token, then recreate the container with `sudo docker compose up -d mcp-grafana`.
 
+#### Restricted MCP server for the Funfair fleets
+
+`mcp-victoriametrics-funfair` is a second VictoriaMetrics MCP server that can only see the Funfair hosts (`buildagent-NN` and `N-clients-funfair-io`), so it can be shared outside the homelab without exposing any other host's metrics. It does not query VictoriaMetrics directly but goes through `vmauth-funfair` (vmauth, configured in `server/victoriaMetrics/vmauth/funfair.yml`), which adds `extra_filters[]={host=~"buildagent-[0-9]+|[0-9]+-clients-funfair-io"}` to every request, so VictoriaMetrics only returns series from those hosts. vmauth does not forward a client query argument that clashes with one in `url_prefix`, so callers cannot widen the filter.
+
+Only the read APIs the MCP query tools need are routed: `/api/v1/query`, `/api/v1/query_range`, `/api/v1/series`, `/api/v1/labels` and `/api/v1/label/<name>/values`. vmauth rejects every other path. The tools that need other APIs are disabled with `MCP_DISABLED_TOOLS`: `export`, `flags`, `metric_relabel_debug`, `downsampling_filters_debug`, `retention_filters_debug`, `test_rules`, `active_queries`, `alerts`, `rules`, `metric_statistics`, `metrics_metadata`, `tsdb_status`, `top_queries` and `tenants`.
+
+To change which hosts it can see, edit the `host=~"..."` regex in the `url_prefix` of `vmauth/funfair.yml`, then recreate the container with `sudo docker compose up -d --force-recreate vmauth-funfair`.
+
+It is reached from outside through the reverse proxies: the firewall lets only the proxies reach port 8084, and they check the bearer token (`FUNFAIR_MCP_TOKEN` in credfeto-traeffic's `.env`) before forwarding. Set `MCP_FUNFAIR_AUTH_TOKEN` in `.env` to the same value so the server checks it too. Unlike the other MCP tokens it is optional: unset means no check on the server itself.
+
 ### Firewall
 
 `./update` (and `./install`) run `firewall/configure`, which locks the host down for ingress and egress:
 
-| Filter                                | Traffic                     | Allowed                                                                                                                                                                                                                                                      |
-|---------------------------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `mon_ingress` (nftables)              | LAN -> published ports      | syslog (514) and the VictoriaLogs ingest (9428) from the internal networks; Grafana (3000), metrics ingest (8428) and the MCP servers (8081-8083) from the reverse proxies only                                                                                 |
-| `host_out` (nftables `mon_egress`)     | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies (Docker Hub mirror, pacman cache, metrics and log shipping), GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats and the Arch WKD, ICMP                                  |
-| `docker_fwd` (nftables `mon_egress`)   | containers -> outside world | DNS, HTTPS to the proxies, Discord (Alertmanager), grafana.com (Grafana), Docker Hub and ghcr.io (Watchtower)                                                                                                                                                 |
+| Filter                               | Traffic                     | Allowed                                                                                                                                                                                                                    |
+|--------------------------------------|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `mon_ingress` (nftables)             | LAN -> published ports      | syslog (514) and the VictoriaLogs ingest (9428) from the internal networks; Grafana (3000), metrics ingest (8428) and the MCP servers (8081-8083) from the reverse proxies only                                            |
+| `host_out` (nftables `mon_egress`)   | host -> anywhere            | DNS to the fleet's DNS servers, NTP to the router, HTTPS to the proxies (Docker Hub mirror, pacman cache, metrics and log shipping), GitHub, ghcr.io, Docker Hub, Cloudflare, chaotic-aur, pkgstats and the Arch WKD, ICMP |
+| `docker_fwd` (nftables `mon_egress`) | containers -> outside world | DNS, HTTPS to the proxies, Discord (Alertmanager), grafana.com (Grafana), Docker Hub and ghcr.io (Watchtower)                                                                                                              |
 
 SSH to the host is left to the host's base configuration.
 

@@ -45,8 +45,8 @@ table inet mon_ingress {
         meta l4proto tcp ct original proto-dst 9428 ip6 saddr @lan6 accept
         # Grafana, metrics ingest (Telegraf, Proxmox) and the MCP servers,
         # from the reverse proxies only.
-        meta l4proto tcp ct original proto-dst { 3000, 8428, 8081, 8082, 8083 } ip saddr @proxies4 accept
-        meta l4proto tcp ct original proto-dst { 3000, 8428, 8081, 8082, 8083 } ip6 saddr @proxies6 accept
+        meta l4proto tcp ct original proto-dst { 3000, 8428, 8081, 8082, 8083, 8084 } ip saddr @proxies4 accept
+        meta l4proto tcp ct original proto-dst { 3000, 8428, 8081, 8082, 8083, 8084 } ip6 saddr @proxies6 accept
         limit rate 30/minute log prefix "mon-ingress-unmatched: " level info
         @INGRESS_ACTION@
     }
