@@ -54,9 +54,11 @@ system_command_exists() {
 
 # The sudoers directory is root-only, so the check runs as root; it reports the
 # answer on stdout so a failed sudo dies rather than reading as "missing".
-smart_sudoers_installed() {
-    sudoers_state="$(sudo sh -c 'if [ -f "$1" ]; then echo present; else echo missing; fi' sh "${TELEGRAF_SMART_SUDOERS}")" || die "Failed to check ${TELEGRAF_SMART_SUDOERS}"
-    [ "${sudoers_state}" = "present" ]
+# install.sh writes the rule for the sudo installed at the time, so a host that
+# later switches to sudo-rs keeps a classic-only line that sudo-rs rejects;
+# visudo (which sudo-rs also ships) catches that as "invalid".
+smart_sudoers_state() {
+    sudo sh -c 'PATH="$2"; if [ ! -f "$1" ]; then echo missing; elif visudo -cf "$1" >/dev/null 2>&1; then echo valid; else echo invalid; fi' sh "${TELEGRAF_SMART_SUDOERS}" "${SYSTEM_PATH}"
 }
 
 # inputs.smart fails to initialise without smartctl, which makes the config
@@ -66,9 +68,12 @@ require_smart_prerequisites() {
         die "smartctl not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)"
     fi
 
-    if ! smart_sudoers_installed; then
-        die "${TELEGRAF_SMART_SUDOERS} not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)"
-    fi
+    sudoers_state="$(smart_sudoers_state)" || die "Failed to check ${TELEGRAF_SMART_SUDOERS}"
+    case "${sudoers_state}" in
+        valid) ;;
+        missing) die "${TELEGRAF_SMART_SUDOERS} not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)" ;;
+        *) die "${TELEGRAF_SMART_SUDOERS} failed visudo validation (for example after switching to sudo-rs); re-run ./install.sh to regenerate it for the installed sudo" ;;
+    esac
 }
 
 validate_config() {
