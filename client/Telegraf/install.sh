@@ -45,8 +45,6 @@ setup_influxdata_apt_repo() {
     keyring_path="/etc/apt/keyrings/influxdata-archive.gpg"
     sources_list="/etc/apt/sources.list.d/influxdata.list"
     sources_list_line="deb [arch=$(dpkg --print-architecture) signed-by=${keyring_path}] https://repos.influxdata.com/ubuntu stable main"
-    work_dir=$(mktemp -d)
-    trap 'rm -rf "${work_dir}"' EXIT
     export GNUPGHOME="${work_dir}/gnupg"
     mkdir -m 0700 "${GNUPGHOME}"
 
@@ -76,26 +74,57 @@ setup_influxdata_apt_repo() {
     fi
 }
 
+apt_package_installed() {
+    dpkg -l "$1" 2>/dev/null | grep -q '^ii'
+}
+
+# Package lists only need refreshing once per run, and not at all when every
+# requested package is already installed.
+apt_lists_updated=false
+
+install_apt_packages() {
+    for package in "$@"; do
+        shift
+        if apt_package_installed "${package}"; then
+            info "${package} already installed, skipping package install."
+        else
+            set -- "$@" "${package}"
+        fi
+    done
+
+    if [ "$#" -gt 0 ]; then
+        if [ "${apt_lists_updated}" = false ]; then
+            sudo apt-get update -qq
+            apt_lists_updated=true
+        fi
+        sudo apt-get install -y "$@"
+    fi
+}
+
+install_pacman_packages() {
+    for package in "$@"; do
+        shift
+        if pacman -Qi "${package}" > /dev/null 2>&1; then
+            info "${package} already installed, skipping package install."
+        else
+            set -- "$@" "${package}"
+        fi
+    done
+
+    if [ "$#" -gt 0 ]; then
+        sudo pacman -S --noconfirm "$@"
+    fi
+}
+
 install_ubuntu() {
     info "Installing Telegraf on Ubuntu/Debian..."
     setup_influxdata_apt_repo
-
-    if ! dpkg -l telegraf 2>/dev/null | grep -q '^ii'; then
-        sudo apt-get update -qq
-        sudo apt-get install -y telegraf
-    else
-        info "Telegraf already installed, skipping package install."
-    fi
+    install_apt_packages telegraf
 }
 
 install_arch() {
     info "Installing Telegraf on Arch Linux..."
-
-    if ! pacman -Qi telegraf > /dev/null 2>&1; then
-        sudo pacman -S --noconfirm telegraf
-    else
-        info "Telegraf already installed, skipping package install."
-    fi
+    install_pacman_packages telegraf
 }
 
 detect_and_install() {
@@ -122,8 +151,68 @@ add_telegraf_to_docker_group() {
     fi
 }
 
+install_smart_tools() {
+    info "Installing SMART tools (smartmontools, nvme-cli)..."
+    if command -v apt-get > /dev/null 2>&1; then
+        install_apt_packages smartmontools nvme-cli
+    else
+        install_pacman_packages smartmontools nvme-cli
+    fi
+}
+
+# Only plain absolute paths are allowed into the sudoers rule: whitespace,
+# commas, wildcards, colons, backslashes and similar are sudoers syntax and
+# could widen the rule beyond the single binary intended.
+require_sudoers_safe_path() {
+    case "$1" in
+        /*) ;;
+        *) die "Refusing to add non-absolute path to sudoers: $1" ;;
+    esac
+    case "$1" in
+        *[!/._+0-9A-Za-z-]*) die "Refusing to add path with unsafe characters to sudoers: $1" ;;
+    esac
+}
+
+# Resolved against the systemd default service PATH rather than the caller's,
+# so the rule names the binary Telegraf's service will actually run, and a
+# user-writable directory early in the caller's PATH cannot end up trusted.
+resolve_system_command() (
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command -v "$1"
+)
+
+install_telegraf_smart_sudoers() {
+    info "Granting telegraf passwordless sudo for smartctl and nvme..."
+
+    sudoers_path="/etc/sudoers.d/telegraf-smart"
+    smartctl_path=$(resolve_system_command smartctl) || die "smartctl not found after installing smartmontools."
+    nvme_path=$(resolve_system_command nvme) || die "nvme not found after installing nvme-cli."
+    require_sudoers_safe_path "${smartctl_path}"
+    require_sudoers_safe_path "${nvme_path}"
+
+    candidate="${work_dir}/telegraf-smart.sudoers"
+    printf 'telegraf ALL=(root) NOPASSWD: %s, %s\n' "${smartctl_path}" "${nvme_path}" > "${candidate}"
+
+    # The installed file is readable by root only, so the comparison runs as root.
+    if sudo cmp -s "${candidate}" "${sudoers_path}"; then
+        info "telegraf SMART sudoers rule already up to date, skipping."
+        return
+    fi
+
+    sudo visudo -cf "${candidate}" > /dev/null || die "Generated sudoers rule failed visudo validation."
+    sudo install -o root -g root -m 0440 "${candidate}" "${sudoers_path}"
+    success "Installed ${sudoers_path}."
+}
+
 main() {
+    # A single EXIT trap covers every temporary file, because POSIX sh keeps
+    # only one handler per condition and a later trap would replace this one.
+    work_dir=$(mktemp -d)
+    trap 'rm -rf "${work_dir}"' EXIT
+
     detect_and_install
+    install_smart_tools
+    install_telegraf_smart_sudoers
     add_telegraf_to_docker_group
     success "Telegraf installation complete."
 }
