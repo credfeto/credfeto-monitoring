@@ -117,14 +117,14 @@ install_pacman_packages() {
 }
 
 install_ubuntu() {
-    info "Installing Telegraf on Ubuntu/Debian..."
+    info "Installing Telegraf and SMART tools on Ubuntu/Debian..."
     setup_influxdata_apt_repo
-    install_apt_packages telegraf
+    install_apt_packages telegraf smartmontools nvme-cli
 }
 
 install_arch() {
-    info "Installing Telegraf on Arch Linux..."
-    install_pacman_packages telegraf
+    info "Installing Telegraf and SMART tools on Arch Linux..."
+    install_pacman_packages telegraf smartmontools nvme-cli
 }
 
 detect_and_install() {
@@ -148,15 +148,6 @@ add_telegraf_to_docker_group() {
         fi
     else
         info "docker group not found — skipping. Docker stats will not be available until Docker is installed and the group exists."
-    fi
-}
-
-install_smart_tools() {
-    info "Installing SMART tools (smartmontools, nvme-cli)..."
-    if command -v apt-get > /dev/null 2>&1; then
-        install_apt_packages smartmontools nvme-cli
-    else
-        install_pacman_packages smartmontools nvme-cli
     fi
 }
 
@@ -211,7 +202,6 @@ main() {
     trap 'rm -rf "${work_dir}"' EXIT
 
     detect_and_install
-    install_smart_tools
     install_telegraf_smart_sudoers
     add_telegraf_to_docker_group
     success "Telegraf installation complete."
