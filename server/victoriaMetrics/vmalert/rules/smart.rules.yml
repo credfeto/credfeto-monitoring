@@ -16,18 +16,23 @@ groups:
           summary: "SMART health check failed for {{ $labels.device }} on {{ $labels.host }}"
           description: "{{ $labels.device }} ({{ $labels.model }} {{ $labels.serial_no }}) on {{ $labels.host }} failed its SMART overall health check."
 
+      # Telegraf writes NVMe "Percentage Used" (and the SAS endurance
+      # indicator, which it maps to the same name) only to smart_attribute,
+      # never to smart_device, so this series exists only while
+      # telegraf.conf keeps attributes = true.
       - alert: SmartDeviceWearHigh
-        expr: last_over_time(smart_device_percentage_used[15m]) >= 90
+        expr: last_over_time(smart_attribute_raw_value{name="Percentage_Used"}[15m]) >= 90
         for: 1h
         labels:
           severity: warning
           wear_indicator: percentage_used
         annotations:
-          summary: "NVMe device {{ $labels.device }} on {{ $labels.host }} is at least 90% worn"
+          summary: "NVMe/SAS device {{ $labels.device }} on {{ $labels.host }} is at least 90% worn"
           description: "{{ $labels.device }} ({{ $labels.model }} {{ $labels.serial_no }}) on {{ $labels.host }} has used {{ $value }}% of its endurance."
 
-      # These SATA attributes are normalised values counting down from 100 to
-      # 0 (remaining life), the opposite direction to NVMe percentage_used.
+      # Telegraf fills these SATA smart_device fields from the normalised
+      # VALUE column, not RAW_VALUE, so they count down from 100 to 0
+      # (remaining life), the opposite direction to NVMe Percentage_Used.
       # A drive can report more than one of them; min by device gives one
       # alert per drive from its worst (lowest) reading rather than one per
       # attribute.
