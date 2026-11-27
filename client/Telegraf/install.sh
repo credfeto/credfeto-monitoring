@@ -167,16 +167,37 @@ resolve_system_command() (
 )
 
 install_telegraf_smart_sudoers() {
-    info "Granting telegraf passwordless sudo for smartctl and nvme..."
+    info "Granting telegraf passwordless sudo for read-only smartctl queries..."
 
     sudoers_path="/etc/sudoers.d/telegraf-smart"
     smartctl_path=$(resolve_system_command smartctl) || die "smartctl not found after installing smartmontools."
-    nvme_path=$(resolve_system_command nvme) || die "nvme not found after installing nvme-cli."
     require_sudoers_safe_path "${smartctl_path}"
-    require_sudoers_safe_path "${nvme_path}"
 
+    # Each entry is the exact argv Telegraf's inputs.smart runs (`sudo -n` plus
+    # the scans and the per-device query), so telegraf cannot use sudo to run
+    # smartctl self-tests or --set, or nvme-cli's format/sanitize/write.
+    # - nvme is left out: inputs.smart only runs it when enable_extensions is
+    #   set, which telegraf.conf does not do.
+    # - Devices are matched with single-character classes, never `*`: sudoers
+    #   wildcards match across spaces, so `/dev/*` would also allow extra
+    #   options appended after the device path.
+    # - `=` must be escaped in sudoers command arguments.
+    # - The Defaults! line stops sudo writing a log entry and a PAM session
+    #   for every poll, as the inputs.smart README recommends.
     candidate="${work_dir}/telegraf-smart.sudoers"
-    printf 'telegraf ALL=(root) NOPASSWD: %s, %s\n' "${smartctl_path}" "${nvme_path}" > "${candidate}"
+    smartctl_query="${smartctl_path} --info --health --attributes --tolerance\\=verypermissive -n standby --format\\=brief"
+    cat > "${candidate}" <<EOF
+# Installed by credfeto-monitoring client/Telegraf/install.sh: read-only
+# smartctl queries for Telegraf's inputs.smart (use_sudo = true).
+Cmnd_Alias TELEGRAF_SMARTCTL = ${smartctl_path} --scan, \\
+    ${smartctl_path} --scan --device\\=nvme, \\
+    ${smartctl_query} /dev/sd[a-z], \\
+    ${smartctl_query} /dev/sd[a-z][a-z], \\
+    ${smartctl_query} /dev/nvme[0-9], \\
+    ${smartctl_query} /dev/nvme[0-9][0-9]
+telegraf ALL=(root) NOPASSWD: TELEGRAF_SMARTCTL
+Defaults!TELEGRAF_SMARTCTL !logfile, !syslog, !pam_session
+EOF
 
     # The installed file is readable by root only, so the comparison runs as root.
     if sudo cmp -s "${candidate}" "${sudoers_path}"; then
