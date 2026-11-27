@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TELEGRAF_CONF_SRC="${SCRIPT_DIR}/telegraf.conf"
 TELEGRAF_CONF_DEST="/etc/telegraf/telegraf.conf"
 TELEGRAF_DEFAULTS="/etc/default/telegraf"
+TELEGRAF_SMART_SUDOERS="/etc/sudoers.d/telegraf-smart"
 
 die() {
     printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
@@ -27,6 +28,31 @@ is_ai_agent() {
     [ "${CLAUDECODE:-}" = "1" ]
 }
 
+# The telegraf service runs with the systemd default PATH, so look only there.
+system_command_exists() (
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    command -v "$1" >/dev/null 2>&1
+)
+
+# The sudoers directory is root-only, so the check runs as root; it reports the
+# answer on stdout so a failed sudo dies rather than reading as "missing".
+smart_sudoers_installed() {
+    sudoers_state="$(sudo sh -c 'if [ -f "$1" ]; then echo present; else echo missing; fi' sh "${TELEGRAF_SMART_SUDOERS}")" || die "Failed to check ${TELEGRAF_SMART_SUDOERS}"
+    [ "${sudoers_state}" = "present" ]
+}
+
+# inputs.smart fails to initialise without smartctl, which makes the config
+# check fail on hosts installed before it was added, so name the real fix.
+require_smart_prerequisites() {
+    if ! system_command_exists smartctl; then
+        die "smartctl not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)"
+    fi
+
+    if ! smart_sudoers_installed; then
+        die "${TELEGRAF_SMART_SUDOERS} not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)"
+    fi
+}
+
 validate_config() {
     info "Validating Telegraf configuration..."
 
@@ -37,6 +63,8 @@ validate_config() {
     if ! command -v telegraf >/dev/null 2>&1; then
         die "telegraf not found; run install.sh first"
     fi
+
+    require_smart_prerequisites
 
     if ! check_output="$(telegraf config check --config "${TELEGRAF_CONF_SRC}" 2>&1)"; then
         die "Telegraf rejected ${TELEGRAF_CONF_SRC}:
