@@ -32,11 +32,23 @@ jobs:
 
       # telegraf:latest is deliberately unpinned (owner-approved exception to version pinning):
       # hosts install the newest Telegraf release, so options it removes must fail here first.
+      # inputs.smart will not initialise without smartctl, so the check image adds the same
+      # SMART tools install.sh puts on hosts before configure.sh runs its own config check.
+      - name: "Build Telegraf check image"
+        shell: bash
+        run: |
+          docker build --pull --tag telegraf-config-check - <<'DOCKERFILE'
+          FROM telegraf:latest
+          RUN apt-get update \
+              && apt-get install -y --no-install-recommends smartmontools nvme-cli \
+              && rm -rf /var/lib/apt/lists/*
+          DOCKERFILE
+
       - name: "Check Telegraf configuration"
         shell: bash
         run: |
           docker run --rm --network none \
             --volume "$GITHUB_WORKSPACE/client/Telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro" \
             --entrypoint telegraf \
-            telegraf:latest \
+            telegraf-config-check \
             config check --config /etc/telegraf/telegraf.conf

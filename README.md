@@ -49,6 +49,11 @@ The starting rule set covers:
 - low available memory
 - a Docker container that is restart-looping
 - the metrics ingestion pipeline stalling entirely
+- a disk whose SMART health check fails (`SmartDeviceUnhealthy`)
+- a disk that has stopped returning SMART data while its host is still reporting (`SmartDeviceNotReporting`); it also fires, and clears 24 hours later, when a disk is excluded, unplugged or given a different `/dev` name on reboot or hot-plug, so silence it then
+- a disk whose SMART data cannot be read because `sudo` or `smartctl` refuses the query or `smartctl` cannot work out the device type, for example a USB disk behind an unsupported USB bridge (`SmartDataUnavailable`); such a disk can be skipped with `excludes = ["/dev/sdX"]` in the `[[inputs.smart]]` section of `client/Telegraf/telegraf.conf`, which raises `SmartDeviceNotReporting` once for that disk for up to 24 hours
+- a disk listed for at least 7 days that has returned no SMART health result in that time, because `smartctl` cannot open it or it has been asleep that long (`SmartHealthStale`); silence it, or skip the disk with `excludes`, if it is expected to sleep for more than 7 days
+- an SSD or NVMe drive nearing the end of its rated wear (`SmartDeviceWearHigh`)
 
 Firing alerts do not yet surface inside Grafana; that is tracked separately in [#20][alerting-in-grafana].
 
@@ -148,13 +153,19 @@ The firewall keeps itself in step with the repo, like the zone sync on the DNS s
 
 ```sh
 cd client/Telegraf
-./install.sh    # installs the Telegraf package (Ubuntu/Debian or Arch)
+./install.sh    # installs Telegraf, smartmontools and nvme-cli (Ubuntu/Debian or Arch)
 ./configure.sh  # validates and deploys telegraf.conf, then (re)starts the service
 ```
+
+After upgrading, re-run `./install.sh` on existing hosts before `./configure.sh`: the SMART input needs `smartctl` and the sudoers rule that `install.sh` installs, and `configure.sh` stops until they are present.
+
+On Ubuntu/Debian, installing smartmontools also enables `smartd`, which is left running; without a mail server its warnings go only to the journal, and on hosts with no SMART-capable disk, such as VMs with virtual disks, `smartd.service` may fail with "Unable to monitor any SMART enabled devices", which is harmless.
 
 `configure.sh` checks `telegraf.conf` against the installed Telegraf (`telegraf config check`, available from Telegraf 1.32) before deploying it, and stops without touching `/etc/telegraf` or the service if Telegraf rejects the configuration. Pull requests that change `client/Telegraf/` run the same check against the latest Telegraf release.
 
 When the installed Telegraf systemd unit reads `/etc/default/telegraf` (as the InfluxData package unit does), `configure.sh` creates that file with `TELEGRAF_OPTS=""` if it is missing, or appends `TELEGRAF_OPTS=""` if the file does not define the variable, so systemd stops warning about an unset variable on every start. An existing `TELEGRAF_OPTS` definition is never changed, and the service is restarted only when the file was created or updated.
+
+`install.sh` also installs `/etc/sudoers.d/telegraf-smart` (validated with `visudo`), which lets the `telegraf` user run through `sudo` only the read-only `smartctl` commands the SMART input uses: the device scans and the health and attribute query for each of `/dev/sda` to `/dev/sdz` and `/dev/nvme0` to `/dev/nvme15`, listed by exact path with no wildcards so the rule works under both classic `sudo` and `sudo-rs`. Each command is listed for every path that reaches the installed `smartctl` (for example both `/usr/bin/smartctl` and `/usr/sbin/smartctl` on Arch, where `/usr/sbin` links to `/usr/bin`), so the rule matches whichever one Telegraf's service `PATH` finds. It does not allow `nvme`, because the SMART input only runs it when `enable_extensions` is set. Under classic `sudo` it turns off sudo's log entry and PAM session for those commands so each poll does not add lines to the auth log; `sudo-rs` (the default on Ubuntu 26.04) has no such settings, so `install.sh` leaves that line out there and each poll is still logged. Re-run `./install.sh` after a host switches to `sudo-rs` (for example on upgrading to Ubuntu 26.04), so the file is rewritten without that line; `configure.sh` checks the file with `visudo` and stops until it passes. Disks beyond `/dev/sdz` or `/dev/nvme15`, or that `smartctl --scan` reports under other names (for example hardware RAID `/dev/bus/N`), are refused by `sudo`, so Telegraf reports only `exit_status` 1 for them, with no health or wear data, and `SmartDataUnavailable` fires for each; extend the list in `install.sh` if a host needs more. The SMART input needs this to read disk health and wear, which it polls every 5 minutes rather than at the agent's normal interval.
 
 The Docker input keeps only the `com.docker.compose.project` and `com.docker.compose.service` container labels as tags; all other labels are dropped to avoid a new series every time a container is recreated.
 

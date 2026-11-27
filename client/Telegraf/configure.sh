@@ -5,18 +5,32 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TELEGRAF_CONF_SRC="${SCRIPT_DIR}/telegraf.conf"
 TELEGRAF_CONF_DEST="/etc/telegraf/telegraf.conf"
 TELEGRAF_DEFAULTS="/etc/default/telegraf"
+TELEGRAF_SMART_SUDOERS="/etc/sudoers.d/telegraf-smart"
+SYSTEM_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 die() {
-    printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    if [ -t 2 ]; then
+        printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
+    else
+        printf '\n✗ %s\n' "$*" >&2
+    fi
     exit 1
 }
 
 success() {
-    printf '\n\033[32m✓\033[0m %s\n' "$*"
+    if [ -t 1 ]; then
+        printf '\n\033[32m✓\033[0m %s\n' "$*"
+    else
+        printf '\n✓ %s\n' "$*"
+    fi
 }
 
 info() {
-    printf '\n\033[32m→\033[0m %s\n' "$*"
+    if [ -t 1 ]; then
+        printf '\n\033[32m→\033[0m %s\n' "$*"
+    else
+        printf '\n→ %s\n' "$*"
+    fi
 }
 
 # Returns true (0) when running inside a Claude Code Bash-tool session.
@@ -27,6 +41,42 @@ is_ai_agent() {
     [ "${CLAUDECODE:-}" = "1" ]
 }
 
+# The checks run with a fixed system PATH rather than the invoking user's, so
+# a user-writable directory early in that PATH cannot change what is found.
+# install.sh's resolve_system_command uses the same list and must match it.
+run_with_system_path() (
+    PATH="${SYSTEM_PATH}"
+    "$@"
+)
+
+system_command_exists() {
+    run_with_system_path command -v "$1" >/dev/null 2>&1
+}
+
+# The sudoers directory is root-only, so the check runs as root; it reports the
+# answer on stdout so a failed sudo dies rather than reading as "missing".
+# install.sh writes the rule for the sudo installed at the time, so a host that
+# later switches to sudo-rs keeps a classic-only line that sudo-rs rejects;
+# visudo (which sudo-rs also ships) catches that as "invalid".
+smart_sudoers_state() {
+    sudo sh -c 'PATH="$2"; if [ ! -f "$1" ]; then echo missing; elif visudo -cf "$1" >/dev/null 2>&1; then echo valid; else echo invalid; fi' sh "${TELEGRAF_SMART_SUDOERS}" "${SYSTEM_PATH}"
+}
+
+# inputs.smart fails to initialise without smartctl, which makes the config
+# check fail on hosts installed before it was added, so name the real fix.
+require_smart_prerequisites() {
+    if ! system_command_exists smartctl; then
+        die "smartctl not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)"
+    fi
+
+    sudoers_state="$(smart_sudoers_state)" || die "Failed to check ${TELEGRAF_SMART_SUDOERS}"
+    case "${sudoers_state}" in
+        valid) ;;
+        missing) die "${TELEGRAF_SMART_SUDOERS} not found; run ./install.sh first (it installs smartmontools, nvme-cli and the telegraf SMART sudoers rule)" ;;
+        *) die "${TELEGRAF_SMART_SUDOERS} failed visudo validation (for example after switching to sudo-rs); re-run ./install.sh to regenerate it for the installed sudo" ;;
+    esac
+}
+
 validate_config() {
     info "Validating Telegraf configuration..."
 
@@ -34,11 +84,13 @@ validate_config() {
         die "telegraf.conf not found at ${TELEGRAF_CONF_SRC}"
     fi
 
-    if ! command -v telegraf >/dev/null 2>&1; then
+    if ! system_command_exists telegraf; then
         die "telegraf not found; run install.sh first"
     fi
 
-    if ! check_output="$(telegraf config check --config "${TELEGRAF_CONF_SRC}" 2>&1)"; then
+    require_smart_prerequisites
+
+    if ! check_output="$(run_with_system_path telegraf config check --config "${TELEGRAF_CONF_SRC}" 2>&1)"; then
         die "Telegraf rejected ${TELEGRAF_CONF_SRC}:
 ${check_output}"
     fi
@@ -112,10 +164,10 @@ manage_service() {
     sudo systemctl enable telegraf
 
     if [ "${config_changed}" = "1" ]; then
-        info "Configuration changed — restarting Telegraf..."
+        info "Configuration changed, restarting Telegraf..."
         sudo systemctl restart telegraf
     elif ! sudo systemctl is-active --quiet telegraf; then
-        info "Telegraf not running — starting..."
+        info "Telegraf not running, starting..."
         sudo systemctl start telegraf
     else
         info "Telegraf already running with unchanged config, skipping restart."

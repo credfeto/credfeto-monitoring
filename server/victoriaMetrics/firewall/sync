@@ -46,7 +46,7 @@ if [ -n "${APPLIED}" ] && git -C "${REPO_DIR}" cat-file -e "${APPLIED}^{commit}"
         exit 0
     fi
     echo "firewall-sync: firewall config changed since ${APPLIED}:"
-    printf '  %s\n' ${CHANGED}
+    printf '%s\n' "${CHANGED}" | sed 's/^/  /'
 else
     echo "firewall-sync: no applied-commit record; applying the firewall config"
 fi
