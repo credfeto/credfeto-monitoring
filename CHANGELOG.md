@@ -39,6 +39,7 @@ Please ADD ALL Changes to the UNRELEASED SECTION and not a specific release
 - mcp-grafana no longer rejects requests as forbidden: Hosts set by `MCP_GRAFANA_ALLOWED_HOSTS`
 - Funfair MCP host filter matched nothing: vmauth decoded the + in its regex as a space
 - Firewall sync script no longer word-splits changed file paths, so paths with spaces work
+- Client and server scripts print colour codes only to a terminal, not into piped output
 ### Changed
 - All containers use `restart: always`, not `unless-stopped`, so they return after a reboot
 - MCP servers use `:latest` images, kept updated by hourly Watchtower (`WATCHTOWER_SCHEDULE`)
