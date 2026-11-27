@@ -73,18 +73,26 @@ groups:
       # the other rules go silent once their 24h lookback runs out. Telegraf
       # (smart.go v1.36.4) passes the exit code through as-is. sudo -n
       # refusing a command exits 1, and smartctl's bit 0 (value 1) means its
-      # command line did not parse; every other smartctl outcome is either 0
-      # or sets a higher bit (a disk asleep under -n standby exits 2, a device
-      # it cannot query for SMART sets bit 2, a failing disk sets bit 3 or
-      # above), so exit_status == 1 means no SMART data could be read, with
-      # no idle-disk false alarms and no time window to tune. min by
-      # (host, device) lets one working poll (0) still in the 15m lookback
-      # hold the alert off and resolve it at once on recovery. If the scan
-      # itself is refused, no device is listed and no exit_status arrives, so
-      # this rule cannot fire; SmartDeviceNotReporting covers that only for a
-      # disk seen in the last 24h, and a host whose scan never worked is not
-      # alerted on. for: 30m (six polls) rides out a brief misconfiguration
-      # while a host is being set up. Warning: a person must fix the host.
+      # command line did not parse. smartctl can also return 1 for a device
+      # it cannot open or identify, for example a USB disk behind a bridge it
+      # does not recognise ("Unknown USB bridge ... specify device type with
+      # -d"), because Telegraf passes only the scanned path with no -d; such
+      # a disk can be skipped with excludes = ["/dev/sdX"] in inputs.smart in
+      # client/Telegraf/telegraf.conf. Every other smartctl outcome is either
+      # 0 or sets a higher bit (a disk asleep under -n standby exits 2, a
+      # device it cannot query for SMART sets bit 2, a failing disk sets bit
+      # 3 or above), so exit_status == 1 means no SMART data could be read,
+      # with no idle-disk false alarms and no time window to tune.
+      # last_over_time keeps only the newest poll of each series, and
+      # min by (host, device) only combines series of the same disk, so the
+      # newest poll decides: the alert is pending from the first poll that
+      # exits 1 and resolves at the first poll that exits otherwise. If the
+      # scan itself is refused, no device is listed and no exit_status
+      # arrives, so this rule cannot fire; SmartDeviceNotReporting covers
+      # that only for a disk seen in the last 24h, and a host whose scan
+      # never worked is not alerted on. for: 30m (six polls) is the debounce:
+      # it rides out a brief misconfiguration while a host is being set up.
+      # Warning: a person must fix the host.
       - alert: SmartDataUnavailable
         expr: |
           min by (host, device) (
@@ -96,9 +104,12 @@ groups:
         annotations:
           summary: "SMART data cannot be read for {{ $labels.device }} on {{ $labels.host }}"
           description: >-
-            smartctl for {{ $labels.device }} on {{ $labels.host }} exits 1 (sudo refused the
-            command or smartctl could not parse it), so no health or wear data is collected;
-            check the sudoers rule installed by install.sh and the Telegraf version.
+            smartctl for {{ $labels.device }} on {{ $labels.host }} exits 1, so no health or
+            wear data is collected. Either sudo refused the command or smartctl rejected its
+            arguments (check the sudoers rule installed by install.sh and the Telegraf
+            version), or smartctl could not open or identify the device, for example a USB
+            disk behind an unsupported USB bridge; such a disk can be skipped with excludes
+            in inputs.smart in telegraf.conf.
 
       # Telegraf v1.36.4 writes NVMe "Percentage Used" (and the SAS
       # endurance indicator, which it maps to the same name) only to

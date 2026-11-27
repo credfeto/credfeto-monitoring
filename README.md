@@ -51,7 +51,7 @@ The starting rule set covers:
 - the metrics ingestion pipeline stalling entirely
 - a disk whose SMART health check fails (`SmartDeviceUnhealthy`)
 - a disk that has stopped returning SMART data while its host is still reporting (`SmartDeviceNotReporting`)
-- a disk whose SMART data cannot be read because `sudo` or `smartctl` refuses the query (`SmartDataUnavailable`)
+- a disk whose SMART data cannot be read because `sudo` or `smartctl` refuses the query or `smartctl` cannot open or identify the device, for example a USB disk behind an unsupported USB bridge (`SmartDataUnavailable`); such a disk can be skipped with `excludes = ["/dev/sdX"]` in the `[[inputs.smart]]` section of `client/Telegraf/telegraf.conf`
 - an SSD or NVMe drive nearing the end of its rated wear (`SmartDeviceWearHigh`)
 
 Firing alerts do not yet surface inside Grafana; that is tracked separately in [#20][alerting-in-grafana].
