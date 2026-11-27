@@ -6,6 +6,7 @@ TELEGRAF_CONF_SRC="${SCRIPT_DIR}/telegraf.conf"
 TELEGRAF_CONF_DEST="/etc/telegraf/telegraf.conf"
 TELEGRAF_DEFAULTS="/etc/default/telegraf"
 TELEGRAF_SMART_SUDOERS="/etc/sudoers.d/telegraf-smart"
+SYSTEM_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 die() {
     printf '\n\033[31m✗\033[0m %s\n' "$*" >&2
@@ -28,11 +29,16 @@ is_ai_agent() {
     [ "${CLAUDECODE:-}" = "1" ]
 }
 
-# The telegraf service runs with the systemd default PATH, so look only there.
-system_command_exists() (
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    command -v "$1" >/dev/null 2>&1
+# The telegraf service runs with the systemd default PATH, so the checks run
+# with it too rather than with the invoking user's PATH.
+run_with_system_path() (
+    PATH="${SYSTEM_PATH}"
+    "$@"
 )
+
+system_command_exists() {
+    run_with_system_path command -v "$1" >/dev/null 2>&1
+}
 
 # The sudoers directory is root-only, so the check runs as root; it reports the
 # answer on stdout so a failed sudo dies rather than reading as "missing".
@@ -60,13 +66,13 @@ validate_config() {
         die "telegraf.conf not found at ${TELEGRAF_CONF_SRC}"
     fi
 
-    if ! command -v telegraf >/dev/null 2>&1; then
+    if ! system_command_exists telegraf; then
         die "telegraf not found; run install.sh first"
     fi
 
     require_smart_prerequisites
 
-    if ! check_output="$(telegraf config check --config "${TELEGRAF_CONF_SRC}" 2>&1)"; then
+    if ! check_output="$(run_with_system_path telegraf config check --config "${TELEGRAF_CONF_SRC}" 2>&1)"; then
         die "Telegraf rejected ${TELEGRAF_CONF_SRC}:
 ${check_output}"
     fi
