@@ -79,7 +79,11 @@ apt_package_installed() {
 }
 
 # Package lists are refreshed only when a requested package is missing.
+# The first argument is "with-recommends" or "without-recommends".
 install_apt_packages() {
+    recommends_mode="$1"
+    shift
+
     for package in "$@"; do
         shift
         if apt_package_installed "${package}"; then
@@ -90,6 +94,9 @@ install_apt_packages() {
     done
 
     if [ "$#" -gt 0 ]; then
+        if [ "${recommends_mode}" = "without-recommends" ]; then
+            set -- --no-install-recommends "$@"
+        fi
         sudo apt-get update -qq
         sudo apt-get install -y "$@"
     fi
@@ -113,7 +120,12 @@ install_pacman_packages() {
 install_ubuntu() {
     info "Installing Telegraf and SMART tools on Ubuntu/Debian..."
     setup_influxdata_apt_repo
-    install_apt_packages telegraf smartmontools nvme-cli
+    # telegraf keeps its Recommends (influxdata-archive-keyring).
+    install_apt_packages with-recommends telegraf
+    # smartmontools Recommends a mailx, which pulls in an MTA (postfix, whose
+    # debconf dialog stops the script, or exim4). Without an MTA smartd cannot
+    # send its mail warnings, but it still logs them to the journal.
+    install_apt_packages without-recommends smartmontools nvme-cli
 }
 
 install_arch() {
