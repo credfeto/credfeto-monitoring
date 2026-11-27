@@ -183,6 +183,30 @@ require_sudoers_safe_path() {
     esac
 }
 
+# A NOPASSWD rule is only as safe as the file it names: anyone who can replace
+# that file, or any directory above it, gains root on the next Telegraf poll
+# (on Debian, for example, the staff group can write /usr/local/sbin). So the
+# file and every directory up to / must be owned by root and writable by
+# nobody else. A symlink's own mode is always 777 and is never used, so only
+# its owner is checked; collect_smartctl_paths adds its canonical target too, so
+# that target's own chain is checked as well.
+require_root_controlled_path() {
+    checked_path="$1"
+    while :; do
+        owner_and_mode=$(stat -c '%u %a' "${checked_path}") || die "Cannot read the owner and mode of ${checked_path}."
+        if [ "${owner_and_mode%% *}" != "0" ]; then
+            die "Refusing to add $1 to sudoers: ${checked_path} is not owned by root."
+        fi
+        if [ ! -L "${checked_path}" ] && [ $((0${owner_and_mode#* } & 022)) -ne 0 ]; then
+            die "Refusing to add $1 to sudoers: ${checked_path} is writable by its group or by others."
+        fi
+        if [ "${checked_path}" = "/" ]; then
+            return 0
+        fi
+        checked_path=$(dirname "${checked_path}")
+    done
+}
+
 # Resolved against a fixed system PATH rather than the caller's, so a
 # user-writable directory early in the caller's PATH cannot end up trusted.
 # configure.sh's SYSTEM_PATH is the same list and must be kept matching it.
@@ -191,9 +215,10 @@ resolve_system_command() (
     command -v "$1"
 )
 
-# Adds a path to smartctl_paths once, after the sudoers safety check.
+# Adds a path to smartctl_paths once, after the sudoers safety checks.
 add_smartctl_path() {
     require_sudoers_safe_path "$1"
+    require_root_controlled_path "$1"
     case " ${smartctl_paths} " in
         *" $1 "*) ;;
         *) smartctl_paths="${smartctl_paths:+${smartctl_paths} }$1" ;;
